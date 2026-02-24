@@ -271,6 +271,13 @@ a:hover { text-decoration: underline; }
 }
 .quest-ref-link:hover { color: var(--cyan); }
 
+.dep-link {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--green);
+  color: var(--green);
+}
+.dep-link:hover { color: var(--cyan); }
+
 /* ── Status badges ──────────────────────────────────────────────────────── */
 .status-badge {
   display: inline-block;
@@ -283,6 +290,56 @@ a:hover { text-decoration: underline; }
 .badge-applied    { background: var(--green-bg); color: var(--green); }
 .badge-error      { background: var(--red-bg); color: var(--red); }
 .badge-downloading { background: var(--yellow-bg); color: var(--yellow); }
+
+/* ── Changelog warning icon ─────────────────────────────────────────────── */
+.changelog-warn {
+  cursor: pointer;
+  color: var(--red);
+  font-size: 0.85rem;
+  margin-left: 0.3rem;
+}
+.changelog-warn:hover { color: var(--yellow); }
+
+/* ── Changelog modal extras ────────────────────────────────────────────── */
+.changelog-version {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.8rem;
+  overflow: hidden;
+}
+.changelog-version-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 0.85rem;
+  user-select: none;
+}
+.changelog-version-header:hover { background: #1c2128; }
+.changelog-version-header .kw-badge {
+  display: inline-block;
+  background: var(--red-bg);
+  color: var(--red);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+.changelog-version-body {
+  display: none;
+  padding: 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.changelog-version-body p { margin-bottom: 0.4rem; }
+.changelog-version-body ul { padding-left: 1.2rem; margin-bottom: 0.4rem; }
+.changelog-version.open .changelog-version-body { display: block; }
 
 /* ── Modals ─────────────────────────────────────────────────────────────── */
 .modal-overlay {

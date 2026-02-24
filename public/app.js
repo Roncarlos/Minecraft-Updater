@@ -3,6 +3,98 @@
 // ── State ──────────────────────────────────────────────────────────────────
 let scanResults = null;
 
+// ── Dependency graph helpers (client-side ports) ──────────────────────────
+
+function buildUpdateLookup() {
+  const lookup = new Map();
+  if (!scanResults) return lookup;
+  for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+    for (const item of cat) {
+      if (item.hasUpdate) lookup.set(item.addonID, item);
+    }
+  }
+  return lookup;
+}
+
+function buildAllModsLookup() {
+  const lookup = new Map();
+  if (!scanResults) return lookup;
+  for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+    for (const item of cat) {
+      lookup.set(item.addonID, item);
+    }
+  }
+  return lookup;
+}
+
+function resolveDependencyChain(targetIds, graph, updateLookup) {
+  const result = new Set(targetIds);
+  const visited = new Set();
+  const queue = [...targetIds];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    const node = graph[current];
+    if (!node) continue;
+
+    for (const depId of node.deps) {
+      if (!result.has(depId) && updateLookup.has(depId)) {
+        result.add(depId);
+        queue.push(depId);
+      }
+    }
+  }
+
+  return [...result];
+}
+
+function topologicalSort(nodeIds, graph) {
+  const nodeSet = new Set(nodeIds);
+  const inDegree = new Map();
+  for (const id of nodeIds) {
+    inDegree.set(id, 0);
+  }
+
+  for (const id of nodeIds) {
+    const node = graph[id];
+    if (!node) continue;
+    for (const depId of node.deps) {
+      if (nodeSet.has(depId)) {
+        inDegree.set(id, (inDegree.get(id) || 0) + 1);
+      }
+    }
+  }
+
+  const queue = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+
+  const sorted = [];
+  while (queue.length > 0) {
+    const current = queue.shift();
+    sorted.push(current);
+
+    const node = graph[current];
+    if (!node) continue;
+    for (const dependentId of node.reverseDeps) {
+      if (!nodeSet.has(dependentId)) continue;
+      const newDeg = (inDegree.get(dependentId) || 1) - 1;
+      inDegree.set(dependentId, newDeg);
+      if (newDeg === 0) queue.push(dependentId);
+    }
+  }
+
+  for (const id of nodeIds) {
+    if (!sorted.includes(id)) sorted.push(id);
+  }
+
+  return sorted;
+}
+
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const btnScan = document.getElementById('btn-scan');
 const optNoCache = document.getElementById('opt-nocache');
@@ -176,9 +268,10 @@ function renderSection(title, cssClass, items, showActions) {
   if (hasUpdates) {
     html += ` <button class="btn btn-download btn-bulk" onclick="downloadAll('${cssClass}')">Download All</button>`;
     html += ` <button class="btn btn-apply btn-bulk" onclick="applyAll('${cssClass}')">Apply All</button>`;
+    html += ` <button class="btn btn-rollback btn-bulk" onclick="rollbackAll('${cssClass}')">Rollback All</button>`;
   }
   html += `</h2>`;
-  html += '<table><thead><tr><th>Mod</th><th>Installed</th><th>Available</th><th>Config Refs</th><th>Quest Refs</th><th>Status</th>';
+  html += '<table><thead><tr><th>Mod</th><th>Installed</th><th>Available</th><th>Config Refs</th><th>Quest Refs</th><th>Deps</th><th>Status</th>';
   if (showActions) html += '<th>Actions</th>';
   html += '</tr></thead><tbody>';
 
@@ -196,9 +289,13 @@ function renderRow(item, cssClass, showActions) {
     : esc(item.name);
   const installed = esc(item.installedFile || '-');
   const latest = esc(item.latestFile || '-');
-  const change = item.breakingReason
+  let change = item.breakingReason
     ? esc(item.breakingReason)
     : item.hasUpdate ? 'Update available' : 'Up to date';
+  if (item.flaggedChangelogs && item.flaggedChangelogs.length > 0) {
+    const n = item.flaggedChangelogs.length;
+    change = `<span class="changelog-warn" onclick="showFlaggedChangelogs(${item.addonID}, '${esc(item.name).replace(/'/g, "\\'")}')">&#9888;${n}</span> ${change}`;
+  }
 
   const refsHtml = item.configRefs > 0
     ? `<span class="config-ref-link" onclick="showConfigRefs(${item.addonID}, '${esc(item.name)}')">${item.configRefs}</span>`
@@ -207,6 +304,17 @@ function renderRow(item, cssClass, showActions) {
   const questRefsHtml = item.questRefs > 0
     ? `<span class="quest-ref-link" onclick="showQuestRefs(${item.addonID}, '${esc(item.name)}')">${item.questRefs}</span>`
     : '0';
+
+  // Deps cell
+  let depsHtml = '0';
+  const deps = item.dependencies || [];
+  if (deps.length > 0) {
+    // Count how many deps have pending updates
+    const updateLookup = buildUpdateLookup();
+    const pendingCount = deps.filter(d => updateLookup.has(d)).length;
+    const label = pendingCount > 0 ? `${deps.length} (${pendingCount} pending)` : String(deps.length);
+    depsHtml = `<span class="dep-link" onclick="showDeps(${item.addonID}, '${esc(item.name)}')">${label}</span>`;
+  }
 
   let actionsHtml = '';
   if (showActions && item.hasUpdate && item.latestFile) {
@@ -223,7 +331,7 @@ function renderRow(item, cssClass, showActions) {
     actionsHtml = '<td></td>';
   }
 
-  return `<tr class="row-${cssClass}" data-addon="${item.addonID}"><td>${name}</td><td>${installed}</td><td>${latest}</td><td>${refsHtml}</td><td>${questRefsHtml}</td><td>${change}</td>${actionsHtml}</tr>`;
+  return `<tr class="row-${cssClass}" data-addon="${item.addonID}"><td>${name}</td><td>${installed}</td><td>${latest}</td><td>${refsHtml}</td><td>${questRefsHtml}</td><td>${depsHtml}</td><td>${change}</td>${actionsHtml}</tr>`;
 }
 
 // ── Config Refs Modal ──────────────────────────────────────────────────────
@@ -274,6 +382,125 @@ async function showQuestRefs(addonId, modName) {
   }
 }
 window.showQuestRefs = showQuestRefs;
+
+// ── Dependencies Modal ─────────────────────────────────────────────────────
+function showDeps(addonId, modName) {
+  const modal = document.getElementById('deps-modal');
+  const title = document.getElementById('deps-modal-title');
+  const body = document.getElementById('deps-modal-body');
+
+  title.textContent = `Dependencies: ${modName}`;
+
+  if (!scanResults || !scanResults.dependencyGraph) {
+    body.innerHTML = '<p style="color:var(--muted)">No dependency data available.</p>';
+    modal.classList.add('active');
+    return;
+  }
+
+  const graph = scanResults.dependencyGraph;
+  const node = graph[addonId];
+  const allMods = buildAllModsLookup();
+  const updateLookup = buildUpdateLookup();
+
+  if (!node || node.deps.length === 0) {
+    body.innerHTML = '<p style="color:var(--muted)">No required dependencies.</p>';
+    modal.classList.add('active');
+    return;
+  }
+
+  // Check missing deps
+  const missingIds = new Set((scanResults.missingDeps || []).map(d => d.addonId));
+
+  let html = '<ul>';
+  for (const depId of node.deps) {
+    const mod = allMods.get(depId);
+    const name = mod ? esc(mod.name) : `Addon ${depId}`;
+    let status;
+    if (updateLookup.has(depId)) {
+      status = '<span style="color:var(--yellow)">has update</span>';
+    } else if (mod) {
+      status = '<span style="color:var(--green)">up to date</span>';
+    } else {
+      status = '<span style="color:var(--muted)">unknown</span>';
+    }
+    html += `<li>${name} — ${status}</li>`;
+  }
+
+  // Show missing deps that aren't installed
+  const myDeps = (allMods.get(addonId)?.dependencies) || [];
+  for (const md of scanResults.missingDeps || []) {
+    if (myDeps.includes(md.addonId) || node.deps.includes(md.addonId)) continue;
+    // already shown above
+  }
+
+  // Also show deps not in graph (missing/uninstalled)
+  const item = allMods.get(addonId);
+  const rawDeps = item ? (item.dependencies || []) : [];
+  for (const depId of rawDeps) {
+    if (node.deps.includes(depId)) continue; // already shown
+    const isMissing = !allMods.has(depId);
+    if (isMissing) {
+      html += `<li>Addon ${depId} — <span style="color:var(--red)">not installed</span></li>`;
+    }
+  }
+
+  html += '</ul>';
+
+  // Show warning about missing deps
+  const relevantMissing = (scanResults.missingDeps || []).filter(md => md.neededBy.includes(addonId));
+  if (relevantMissing.length > 0) {
+    html += '<p style="color:var(--yellow);margin-top:0.8rem;font-size:0.85rem">Some required dependencies are not installed in this instance.</p>';
+  }
+
+  body.innerHTML = html;
+  modal.classList.add('active');
+}
+window.showDeps = showDeps;
+
+// ── Flagged Changelogs Modal ────────────────────────────────────────────
+function showFlaggedChangelogs(addonId, modName) {
+  const modal = document.getElementById('changelog-modal');
+  const title = document.getElementById('changelog-modal-title');
+  const body = document.getElementById('changelog-modal-body');
+
+  title.textContent = `Flagged Changelogs: ${modName}`;
+
+  // Find the item across all categories
+  let item = null;
+  if (scanResults) {
+    for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+      for (const m of cat) {
+        if (m.addonID === addonId) { item = m; break; }
+      }
+      if (item) break;
+    }
+  }
+
+  if (!item || !item.flaggedChangelogs || item.flaggedChangelogs.length === 0) {
+    body.innerHTML = '<p style="color:var(--muted)">No flagged changelogs found.</p>';
+    modal.classList.add('active');
+    return;
+  }
+
+  let html = '';
+  for (const entry of item.flaggedChangelogs) {
+    const date = new Date(entry.fileDate).toLocaleDateString();
+    const uniqueKws = [...new Set(entry.keywords)];
+    const badges = uniqueKws.map(kw => `<span class="kw-badge">${esc(kw)}</span>`).join(' ');
+    html += `<div class="changelog-version">`;
+    html += `<div class="changelog-version-header" onclick="this.parentElement.classList.toggle('open')">`;
+    html += `<span style="color:var(--text);font-weight:600">${esc(entry.fileName)}</span>`;
+    html += `<span style="color:var(--muted);font-size:0.8rem">${date}</span>`;
+    html += badges;
+    html += `</div>`;
+    html += `<div class="changelog-version-body">${entry.changelogHtml}</div>`;
+    html += `</div>`;
+  }
+
+  body.innerHTML = html;
+  modal.classList.add('active');
+}
+window.showFlaggedChangelogs = showFlaggedChangelogs;
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('active');
@@ -333,13 +560,73 @@ async function applyOne(addonId, oldFileName, newFileName) {
   const body = document.getElementById('apply-modal-body');
   const confirmBtn = document.getElementById('apply-modal-confirm');
 
+  // Resolve dependency chain
+  const graph = scanResults?.dependencyGraph || {};
+  const updateLookup = buildUpdateLookup();
+  const allMods = buildAllModsLookup();
+  const chainIds = resolveDependencyChain([addonId], graph, updateLookup);
+  const extraDepIds = chainIds.filter(id => id !== addonId);
+
   title.textContent = 'Confirm Apply';
-  body.innerHTML = `<p>Replace <strong>${esc(oldFileName)}</strong> with <strong>${esc(newFileName)}</strong>?</p>
-    <p style="color:var(--muted);margin-top:0.5rem;font-size:0.85rem">The old jar will be backed up and can be rolled back.</p>`;
+  let bodyHtml = `<p>Replace <strong>${esc(oldFileName)}</strong> with <strong>${esc(newFileName)}</strong>?</p>`;
+
+  if (extraDepIds.length > 0) {
+    bodyHtml += '<p style="color:var(--yellow);margin-top:0.8rem;font-size:0.85rem">The following dependencies will also be updated:</p>';
+    bodyHtml += '<ul style="margin-top:0.3rem">';
+    for (const depId of extraDepIds) {
+      const dep = updateLookup.get(depId);
+      if (dep) bodyHtml += `<li>${esc(dep.name)}: ${esc(dep.installedFile)} &rarr; ${esc(dep.latestFile)}</li>`;
+    }
+    bodyHtml += '</ul>';
+  }
+
+  // Warn about missing deps
+  const relevantMissing = (scanResults?.missingDeps || []).filter(md => md.neededBy.includes(addonId));
+  if (relevantMissing.length > 0) {
+    bodyHtml += `<p style="color:var(--red);margin-top:0.5rem;font-size:0.85rem">${relevantMissing.length} required dep(s) not installed in this instance.</p>`;
+  }
+
+  bodyHtml += '<p style="color:var(--muted);margin-top:0.5rem;font-size:0.85rem">The old jars will be backed up and can be rolled back.</p>';
+  body.innerHTML = bodyHtml;
   modal.classList.add('active');
 
   confirmBtn.onclick = async () => {
     modal.classList.remove('active');
+
+    // Build ordered list: deps first, then target
+    const sortedIds = topologicalSort(chainIds, graph);
+    const allModsToApply = sortedIds
+      .map(id => {
+        const item = allMods.get(id);
+        if (!item || !item.hasUpdate || !item.latestFile) return null;
+        return { addonId: id, oldFileName: item.installedFile, newFileName: item.latestFile, downloadUrl: item.downloadUrl };
+      })
+      .filter(Boolean);
+
+    // First, download any not-yet-downloaded deps
+    let stateResp;
+    try { stateResp = await fetch('/api/download-state'); } catch { return; }
+    const dlState = await stateResp.json();
+
+    const needsDownload = allModsToApply.filter(m => {
+      const s = dlState[String(m.addonId)];
+      return (!s || (s.status !== 'downloaded' && s.status !== 'applied')) && m.downloadUrl;
+    });
+
+    if (needsDownload.length > 0) {
+      try {
+        await fetch('/api/download/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mods: needsDownload.map(m => ({ addonId: m.addonId, downloadUrl: m.downloadUrl, fileName: m.newFileName })) }),
+        });
+      } catch { /* continue — apply will catch missing files */ }
+    }
+
+    // Now apply all in topological order
+    const modsToApply = allModsToApply.map(m => ({ addonId: m.addonId, oldFileName: m.oldFileName, newFileName: m.newFileName }));
+
+    // Update UI for target mod
     const actionsEl = document.getElementById(`actions-${addonId}`);
     const applyBtn = actionsEl?.querySelector('.btn-apply');
     if (applyBtn) {
@@ -348,18 +635,22 @@ async function applyOne(addonId, oldFileName, newFileName) {
     }
 
     try {
-      const resp = await fetch('/api/apply', {
+      const resp = await fetch('/api/apply/bulk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ addonId, oldFileName, newFileName }),
+        body: JSON.stringify({ mods: modsToApply }),
       });
-      const data = await resp.json();
-      if (data.success) {
-        if (actionsEl) {
-          actionsEl.innerHTML = `<span class="status-badge badge-applied">Applied</span> <button class="btn btn-rollback" onclick="rollbackOne(${addonId}, '${esc(oldFileName)}', '${esc(newFileName)}')">Rollback</button>`;
+      const results = await resp.json();
+
+      for (const result of results) {
+        const el = document.getElementById(`actions-${result.addonId}`);
+        if (!el) continue;
+        if (result.success) {
+          el.innerHTML = `<span class="status-badge badge-applied">Applied</span> <button class="btn btn-rollback" onclick="rollbackOne(${result.addonId}, '${esc(result.oldFileName)}', '${esc(result.newFileName)}')">Rollback</button>`;
+        } else {
+          const btn = el.querySelector('.btn-apply');
+          if (btn) { btn.textContent = 'Failed'; btn.disabled = false; }
         }
-      } else {
-        throw new Error(data.error);
       }
     } catch (err) {
       if (applyBtn) {
@@ -416,6 +707,70 @@ async function rollbackOne(addonId, oldFileName, newFileName) {
 }
 window.rollbackOne = rollbackOne;
 
+// ── Rollback All ────────────────────────────────────────────────────────────
+async function rollbackAll(sectionClass) {
+  if (!scanResults) return;
+
+  let items;
+  if (sectionClass === 'breaking') items = scanResults.breaking;
+  else if (sectionClass === 'safe') items = scanResults.safeToUpdate;
+  else if (sectionClass === 'update') items = scanResults.updates;
+  else return;
+
+  // Only include mods that have been applied (check download state)
+  let stateResp;
+  try {
+    stateResp = await fetch('/api/download-state');
+  } catch { return; }
+  const state = await stateResp.json();
+
+  const mods = items
+    .filter(i => {
+      const s = state[String(i.addonID)];
+      return s && s.status === 'applied' && i.hasUpdate && i.latestFile;
+    })
+    .map(i => ({ addonId: i.addonID, oldFileName: i.installedFile, newFileName: i.latestFile }));
+
+  if (mods.length === 0) return;
+
+  // Show confirmation modal
+  const modal = document.getElementById('apply-modal');
+  const title = document.getElementById('apply-modal-title');
+  const body = document.getElementById('apply-modal-body');
+  const confirmBtn = document.getElementById('apply-modal-confirm');
+
+  title.textContent = `Rollback ${mods.length} Mods`;
+  body.innerHTML = `<p>This will restore the following mods to their previous versions:</p><ul style="margin-top:0.5rem">` +
+    mods.map(m => `<li>${esc(m.newFileName)} &rarr; ${esc(m.oldFileName)}</li>`).join('') +
+    '</ul><p style="color:var(--muted);margin-top:0.5rem;font-size:0.85rem">Backups will be copied back to the mods folder.</p>';
+  modal.classList.add('active');
+
+  confirmBtn.onclick = async () => {
+    modal.classList.remove('active');
+
+    try {
+      const resp = await fetch('/api/rollback/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mods }),
+      });
+      const results = await resp.json();
+
+      for (const result of results) {
+        const actionsEl = document.getElementById(`actions-${result.addonId}`);
+        if (!actionsEl) continue;
+        if (result.success) {
+          actionsEl.innerHTML = '<span class="status-badge badge-rolledback">Rolled back</span>';
+        } else {
+          const rbBtn = actionsEl.querySelector('.btn-rollback');
+          if (rbBtn) rbBtn.textContent = 'Failed';
+        }
+      }
+    } catch { /* ignore */ }
+  };
+}
+window.rollbackAll = rollbackAll;
+
 // ── Download All ───────────────────────────────────────────────────────────
 async function downloadAll(sectionClass) {
   if (!scanResults) return;
@@ -427,9 +782,24 @@ async function downloadAll(sectionClass) {
   else if (sectionClass === 'update') items = scanResults.updates;
   else return;
 
-  const mods = items
-    .filter(i => i.hasUpdate && i.downloadUrl && i.latestFile)
-    .map(i => ({ addonId: i.addonID, downloadUrl: i.downloadUrl, fileName: i.latestFile }));
+  // Resolve dependency chain for all items in the section
+  const graph = scanResults.dependencyGraph || {};
+  const updateLookup = buildUpdateLookup();
+  const targetIds = items.filter(i => i.hasUpdate).map(i => i.addonID);
+  const chainIds = resolveDependencyChain(targetIds, graph, updateLookup);
+
+  // Build mod list including deps
+  const allMods = buildAllModsLookup();
+  const seenIds = new Set();
+  const mods = [];
+  for (const id of chainIds) {
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    const item = allMods.get(id);
+    if (item && item.hasUpdate && item.downloadUrl && item.latestFile) {
+      mods.push({ addonId: item.addonID, downloadUrl: item.downloadUrl, fileName: item.latestFile });
+    }
+  }
 
   if (mods.length === 0) return;
 
@@ -494,6 +864,14 @@ async function applyAll(sectionClass) {
   else if (sectionClass === 'update') items = scanResults.updates;
   else return;
 
+  // Resolve dependency chain for all items in the section
+  const graph = scanResults.dependencyGraph || {};
+  const updateLookup = buildUpdateLookup();
+  const allMods = buildAllModsLookup();
+  const targetIds = items.filter(i => i.hasUpdate && i.latestFile).map(i => i.addonID);
+  const chainIds = resolveDependencyChain(targetIds, graph, updateLookup);
+  const sortedIds = topologicalSort(chainIds, graph);
+
   // Only include mods that have been downloaded (check download state)
   let stateResp;
   try {
@@ -501,12 +879,17 @@ async function applyAll(sectionClass) {
   } catch { return; }
   const state = await stateResp.json();
 
-  const mods = items
-    .filter(i => {
-      const s = state[String(i.addonID)];
-      return s && (s.status === 'downloaded' || s.status === 'applied') && i.hasUpdate && i.latestFile;
-    })
-    .map(i => ({ addonId: i.addonID, oldFileName: i.installedFile, newFileName: i.latestFile }));
+  const mods = [];
+  const extraDeps = [];
+  for (const id of sortedIds) {
+    const item = allMods.get(id);
+    if (!item || !item.hasUpdate || !item.latestFile) continue;
+    const s = state[String(id)];
+    if (!s || (s.status !== 'downloaded' && s.status !== 'applied')) continue;
+    const entry = { addonId: item.addonID, oldFileName: item.installedFile, newFileName: item.latestFile };
+    mods.push(entry);
+    if (!targetIds.includes(id)) extraDeps.push(item);
+  }
 
   if (mods.length === 0) return;
 
@@ -517,9 +900,16 @@ async function applyAll(sectionClass) {
   const confirmBtn = document.getElementById('apply-modal-confirm');
 
   title.textContent = `Apply ${mods.length} Updates`;
-  body.innerHTML = `<p>This will replace the following mods:</p><ul style="margin-top:0.5rem">` +
+  let bodyHtml = `<p>This will replace the following mods:</p><ul style="margin-top:0.5rem">` +
     mods.map(m => `<li>${esc(m.oldFileName)} &rarr; ${esc(m.newFileName)}</li>`).join('') +
     '</ul>';
+
+  if (extraDeps.length > 0) {
+    bodyHtml += '<p style="color:var(--yellow);margin-top:0.8rem;font-size:0.85rem">Includes dependencies from other sections:</p>';
+    bodyHtml += '<ul style="margin-top:0.3rem">' + extraDeps.map(d => `<li>${esc(d.name)}</li>`).join('') + '</ul>';
+  }
+
+  body.innerHTML = bodyHtml;
   modal.classList.add('active');
 
   confirmBtn.onclick = async () => {
