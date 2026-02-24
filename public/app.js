@@ -410,13 +410,14 @@ function renderResults(data) {
 function renderSection(title, cssClass, items, showActions) {
   const hasUpdates = showActions && items.some(i => i.hasUpdate && i.latestFile);
   let html = `<div class="section section-${cssClass}">`;
-  html += `<h2><span>${title} (${items.length})</span>`;
+  html += `<h2 onclick="toggleSection(this)"><span class="section-toggle">&#9660;</span><span>${title} (${items.length})</span>`;
   if (hasUpdates) {
-    html += ` <button class="btn btn-download btn-bulk" onclick="downloadAll('${cssClass}')">Download All</button>`;
-    html += ` <button class="btn btn-apply btn-bulk" onclick="applyAll('${cssClass}')">Apply All</button>`;
-    html += ` <button class="btn btn-rollback btn-bulk" onclick="rollbackAll('${cssClass}')">Rollback All</button>`;
+    html += ` <button class="btn btn-download btn-bulk" onclick="event.stopPropagation(); downloadAll('${cssClass}')">Download All</button>`;
+    html += ` <button class="btn btn-apply btn-bulk" onclick="event.stopPropagation(); applyAll('${cssClass}')">Apply All</button>`;
+    html += ` <button class="btn btn-rollback btn-bulk" onclick="event.stopPropagation(); rollbackAll('${cssClass}')">Rollback All</button>`;
   }
   html += `</h2>`;
+  html += '<div class="section-body">';
   html += '<table><thead><tr><th>Mod</th><th>Installed</th><th>Available</th><th>Config Refs</th><th>Quest Refs</th><th>Deps</th><th>Status</th>';
   if (showActions) html += '<th>Actions</th>';
   html += '</tr></thead><tbody>';
@@ -425,9 +426,14 @@ function renderSection(title, cssClass, items, showActions) {
     html += renderRow(item, cssClass, showActions);
   }
 
-  html += '</tbody></table></div>';
+  html += '</tbody></table></div></div>';
   return html;
 }
+
+function toggleSection(h2) {
+  h2.closest('.section').classList.toggle('collapsed');
+}
+window.toggleSection = toggleSection;
 
 function renderRow(item, cssClass, showActions) {
   const name = item.url

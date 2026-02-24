@@ -222,6 +222,27 @@ body {
   display: flex;
   align-items: center;
   gap: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+}
+.section.collapsed h2 {
+  border-bottom: 1px solid;
+  border-radius: 8px;
+}
+.section-toggle {
+  display: inline-block;
+  font-size: 0.8rem;
+  transition: transform 0.2s ease;
+}
+.section.collapsed .section-toggle {
+  transform: rotate(-90deg);
+}
+.section-body {
+  transition: max-height 0.3s ease, opacity 0.2s ease;
+  overflow: hidden;
+}
+.section.collapsed .section-body {
+  display: none;
 }
 .section-breaking h2 { background: var(--red-bg); color: var(--red); border-color: var(--red); }
 .section-safe h2     { background: var(--cyan-bg); color: var(--cyan); border-color: var(--cyan); }
