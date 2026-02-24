@@ -1,0 +1,6 @@
+node_modules/
+downloads/
+backups/
+ModUpdateCache.json
+ModUpdateReport.html
+.claude/

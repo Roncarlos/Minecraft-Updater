@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mod Update Manager</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="header">
+  <h1>Mod Update Manager</h1>
+  <div class="profile-selector">
+    <label for="profile-select">Profile:</label>
+    <select id="profile-select"></select>
+  </div>
+  <div class="meta" id="instance-meta">Loading instance data...</div>
+  <div class="stats" id="stats" style="display:none">
+    <div class="stat stat-breaking">
+      <div class="number" id="stat-breaking">0</div>
+      <div class="label">Breaking Changes</div>
+    </div>
+    <div class="stat stat-safe">
+      <div class="number" id="stat-safe">0</div>
+      <div class="label">Safe to Update</div>
+    </div>
+    <div class="stat stat-update">
+      <div class="number" id="stat-update">0</div>
+      <div class="label">Updates Available</div>
+    </div>
+    <div class="stat stat-ok">
+      <div class="number" id="stat-ok">0</div>
+      <div class="label">Up to Date</div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" id="btn-scan">Scan for Updates</button>
+  <label><input type="checkbox" id="opt-nocache"> No Cache</label>
+  <label><input type="checkbox" id="opt-changelogs"> Check Changelogs</label>
+  <label>Limit: <input type="number" id="opt-limit" min="0" value="0" placeholder="0=all"></label>
+</div>
+
+<div class="progress-container" id="progress-container">
+  <div class="progress-info">
+    <span id="progress-text">Starting scan...</span>
+    <span id="progress-count">0 / 0</span>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+  </div>
+</div>
+
+<div id="results"></div>
+
+<!-- Config Refs Modal -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <h3 id="config-modal-title">Config References</h3>
+    <div class="modal-body" id="config-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal('config-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quest Refs Modal -->
+<div class="modal-overlay" id="quest-modal">
+  <div class="modal">
+    <h3 id="quest-modal-title">Quest References</h3>
+    <div class="modal-body" id="quest-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal('quest-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Apply Confirmation Modal -->
+<div class="modal-overlay" id="apply-modal">
+  <div class="modal">
+    <h3 id="apply-modal-title">Confirm Apply</h3>
+    <div class="modal-body" id="apply-modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal('apply-modal')">Cancel</button>
+      <button class="btn btn-confirm" id="apply-modal-confirm">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Mod Update Manager &middot; CurseForge API v1
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
