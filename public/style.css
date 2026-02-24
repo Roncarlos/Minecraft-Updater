@@ -14,6 +14,10 @@
   --blue-bg: #121d2f;
   --cyan: #39d2c0;
   --cyan-bg: #0f2d2a;
+  --orange: #e3873e;
+  --orange-bg: #2d2015;
+  --purple: #b87aff;
+  --purple-bg: #231a33;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -97,6 +101,10 @@ body {
 .stat-safe .number { color: var(--cyan); }
 .stat-update { background: var(--yellow-bg); border: 1px solid var(--yellow); }
 .stat-update .number { color: var(--yellow); }
+.stat-caution { background: var(--orange-bg); border: 1px solid var(--orange); }
+.stat-caution .number { color: var(--orange); }
+.stat-review-deps { background: var(--purple-bg); border: 1px solid var(--purple); }
+.stat-review-deps .number { color: var(--purple); }
 .stat-ok { background: var(--green-bg); border: 1px solid var(--green); }
 .stat-ok .number { color: var(--green); }
 
@@ -218,6 +226,8 @@ body {
 .section-breaking h2 { background: var(--red-bg); color: var(--red); border-color: var(--red); }
 .section-safe h2     { background: var(--cyan-bg); color: var(--cyan); border-color: var(--cyan); }
 .section-update h2   { background: var(--yellow-bg); color: var(--yellow); border-color: var(--yellow); }
+.section-caution h2      { background: var(--orange-bg); color: var(--orange); border-color: var(--orange); }
+.section-review-deps h2  { background: var(--purple-bg); color: var(--purple); border-color: var(--purple); }
 .section-ok h2       { background: var(--green-bg); color: var(--green); border-color: var(--green); }
 
 table {
@@ -252,6 +262,8 @@ tr:hover { background: #1c2128; }
 tr.row-breaking td:first-child { border-left: 3px solid var(--red); }
 tr.row-safe td:first-child     { border-left: 3px solid var(--cyan); }
 tr.row-update td:first-child   { border-left: 3px solid var(--yellow); }
+tr.row-caution td:first-child      { border-left: 3px solid var(--orange); }
+tr.row-review-deps td:first-child  { border-left: 3px solid var(--purple); }
 tr.row-ok td:first-child       { border-left: 3px solid var(--green); }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -277,6 +289,9 @@ a:hover { text-decoration: underline; }
   color: var(--green);
 }
 .dep-link:hover { color: var(--cyan); }
+
+.dep-warn-breaking { color: var(--red); font-size: 0.85rem; margin-left: 0.2rem; }
+.dep-warn-caution  { color: var(--orange); font-size: 0.85rem; margin-left: 0.2rem; }
 
 /* ── Status badges ──────────────────────────────────────────────────────── */
 .status-badge {

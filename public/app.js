@@ -8,8 +8,8 @@ let scanResults = null;
 function buildUpdateLookup() {
   const lookup = new Map();
   if (!scanResults) return lookup;
-  for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
-    for (const item of cat) {
+  for (const cat of [scanResults.breaking, scanResults.caution, scanResults.reviewDeps, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+    for (const item of (cat || [])) {
       if (item.hasUpdate) lookup.set(item.addonID, item);
     }
   }
@@ -19,8 +19,8 @@ function buildUpdateLookup() {
 function buildAllModsLookup() {
   const lookup = new Map();
   if (!scanResults) return lookup;
-  for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
-    for (const item of cat) {
+  for (const cat of [scanResults.breaking, scanResults.caution, scanResults.reviewDeps, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+    for (const item of (cat || [])) {
       lookup.set(item.addonID, item);
     }
   }
@@ -365,10 +365,12 @@ function startScan() {
 
 // ── Render ──────────────────────────────────────────────────────────────────
 function renderResults(data) {
-  const { metadata, breaking, safeToUpdate, updates, upToDate, errors } = data;
+  const { metadata, breaking, caution, reviewDeps, safeToUpdate, updates, upToDate, errors } = data;
 
   // Update stats
   document.getElementById('stat-breaking').textContent = breaking.length;
+  document.getElementById('stat-caution').textContent = (caution || []).length;
+  document.getElementById('stat-review-deps').textContent = (reviewDeps || []).length;
   document.getElementById('stat-safe').textContent = safeToUpdate.length;
   document.getElementById('stat-update').textContent = updates.length;
   document.getElementById('stat-ok').textContent = upToDate.length;
@@ -378,6 +380,12 @@ function renderResults(data) {
 
   if (breaking.length > 0) {
     html += renderSection('Breaking Changes', 'breaking', breaking, true);
+  }
+  if (caution && caution.length > 0) {
+    html += renderSection('Caution', 'caution', caution, true);
+  }
+  if (reviewDeps && reviewDeps.length > 0) {
+    html += renderSection('Review Deps', 'review-deps', reviewDeps, true);
   }
   if (safeToUpdate.length > 0) {
     html += renderSection('Safe to Update', 'safe', safeToUpdate, true);
@@ -460,7 +468,17 @@ function renderRow(item, cssClass, showActions) {
     const updateLookup = buildUpdateLookup();
     const pendingCount = deps.filter(d => updateLookup.has(d)).length;
     const label = pendingCount > 0 ? `${deps.length} (${pendingCount} pending)` : String(deps.length);
-    depsHtml = `<span class="dep-link" onclick="showDeps(${item.addonID}, '${esc(item.name)}')">${label}</span>`;
+
+    // Check if any deps are in breaking or caution buckets
+    const breakingIds = new Set((scanResults?.breaking || []).map(m => m.addonID));
+    const cautionIds = new Set((scanResults?.caution || []).map(m => m.addonID));
+    const hasBreakingDep = deps.some(d => breakingIds.has(d));
+    const hasCautionDep = deps.some(d => cautionIds.has(d));
+    let depIcons = '';
+    if (hasBreakingDep) depIcons += ' <span class="dep-warn-breaking" title="Has dependency with breaking changes">&#9888;</span>';
+    if (hasCautionDep) depIcons += ' <span class="dep-warn-caution" title="Has dependency requiring caution">&#9670;</span>';
+
+    depsHtml = `<span class="dep-link" onclick="showDeps(${item.addonID}, '${esc(item.name)}')">${label}</span>${depIcons}`;
   }
 
   let actionsHtml = '';
@@ -557,11 +575,16 @@ function showDeps(addonId, modName) {
 
   // Check missing deps
   const missingIds = new Set((scanResults.missingDeps || []).map(d => d.addonId));
+  const breakingIds = new Set((scanResults.breaking || []).map(m => m.addonID));
+  const cautionIds = new Set((scanResults.caution || []).map(m => m.addonID));
 
   let html = '<ul>';
   for (const depId of node.deps) {
     const mod = allMods.get(depId);
     const name = mod ? esc(mod.name) : `Addon ${depId}`;
+    let icon = '';
+    if (breakingIds.has(depId)) icon = ' <span class="dep-warn-breaking" title="Breaking changes">&#9888;</span>';
+    else if (cautionIds.has(depId)) icon = ' <span class="dep-warn-caution" title="Caution">&#9670;</span>';
     let status;
     if (updateLookup.has(depId)) {
       status = '<span style="color:var(--yellow)">has update</span>';
@@ -570,7 +593,7 @@ function showDeps(addonId, modName) {
     } else {
       status = '<span style="color:var(--muted)">unknown</span>';
     }
-    html += `<li>${name} — ${status}</li>`;
+    html += `<li>${name}${icon} — ${status}</li>`;
   }
 
   // Show missing deps that aren't installed
@@ -613,8 +636,8 @@ function showFlaggedChangelogs(addonId, modName) {
   // Find the item across all categories
   let item = null;
   if (scanResults) {
-    for (const cat of [scanResults.breaking, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
-      for (const m of cat) {
+    for (const cat of [scanResults.breaking, scanResults.caution, scanResults.reviewDeps, scanResults.safeToUpdate, scanResults.updates, scanResults.upToDate]) {
+      for (const m of (cat || [])) {
         if (m.addonID === addonId) { item = m; break; }
       }
       if (item) break;
@@ -896,6 +919,8 @@ async function rollbackAll(sectionClass) {
 
   let items;
   if (sectionClass === 'breaking') items = scanResults.breaking;
+  else if (sectionClass === 'caution') items = scanResults.caution;
+  else if (sectionClass === 'review-deps') items = scanResults.reviewDeps;
   else if (sectionClass === 'safe') items = scanResults.safeToUpdate;
   else if (sectionClass === 'update') items = scanResults.updates;
   else return;
@@ -961,6 +986,8 @@ async function downloadAll(sectionClass) {
   // Gather all mods from the relevant section that have download URLs
   let items;
   if (sectionClass === 'breaking') items = scanResults.breaking;
+  else if (sectionClass === 'caution') items = scanResults.caution;
+  else if (sectionClass === 'review-deps') items = scanResults.reviewDeps;
   else if (sectionClass === 'safe') items = scanResults.safeToUpdate;
   else if (sectionClass === 'update') items = scanResults.updates;
   else return;
@@ -1043,6 +1070,8 @@ async function applyAll(sectionClass) {
 
   let items;
   if (sectionClass === 'breaking') items = scanResults.breaking;
+  else if (sectionClass === 'caution') items = scanResults.caution;
+  else if (sectionClass === 'review-deps') items = scanResults.reviewDeps;
   else if (sectionClass === 'safe') items = scanResults.safeToUpdate;
   else if (sectionClass === 'update') items = scanResults.updates;
   else return;
