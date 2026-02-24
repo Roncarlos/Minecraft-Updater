@@ -434,3 +434,92 @@ a:hover { text-decoration: underline; }
   gap: 0.4rem;
   align-items: center;
 }
+
+/* ── Settings button ─────────────────────────────────────────────────────── */
+.btn-settings {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  margin-left: auto;
+  font-size: 1.1rem;
+  padding: 0.35rem 0.7rem;
+  line-height: 1;
+}
+.btn-settings:hover { color: var(--text); border-color: var(--muted); }
+
+/* ── Settings modal ──────────────────────────────────────────────────────── */
+.settings-section h4 {
+  color: var(--blue);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.settings-field {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.6rem;
+}
+.settings-field label {
+  min-width: 100px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.settings-field input[type="text"],
+.settings-field input[type="password"],
+.settings-field input[type="number"] {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.settings-field input:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+/* ── LLM severity badges ────────────────────────────────────────────────── */
+.llm-badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  margin-right: 0.3rem;
+}
+.llm-badge-safe { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.llm-badge-caution { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow); }
+.llm-badge-breaking { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+
+/* ── LLM analysis in modal ───────────────────────────────────────────────── */
+.llm-summary {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem 0.8rem;
+  margin: 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.llm-breaking-items {
+  margin: 0.3rem 0;
+  padding-left: 1.2rem;
+}
+.llm-breaking-items li {
+  color: var(--red);
+  font-size: 0.85rem;
+  padding: 0.15rem 0;
+  border-bottom: none;
+  font-family: inherit;
+}

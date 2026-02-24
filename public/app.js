@@ -108,6 +108,8 @@ const resultsDiv = document.getElementById('results');
 const statsDiv = document.getElementById('stats');
 const instanceMeta = document.getElementById('instance-meta');
 
+const optLlm = document.getElementById('opt-llm');
+const btnSettings = document.getElementById('btn-settings');
 const profileSelect = document.getElementById('profile-select');
 
 // ── Init ───────────────────────────────────────────────────────────────────
@@ -130,7 +132,142 @@ async function init() {
 
   // Load current instance info
   await loadInstanceInfo();
+
+  // Load LLM toggle state
+  await loadLlmState();
 }
+
+// ── LLM State ──────────────────────────────────────────────────────────────
+async function loadLlmState() {
+  try {
+    const resp = await fetch('/api/settings');
+    const settings = await resp.json();
+    const configured = settings.llm && settings.llm.enabled && settings.llm.endpoint && settings.llm.model;
+    optLlm.disabled = !configured;
+    if (!configured) optLlm.checked = false;
+  } catch {
+    optLlm.disabled = true;
+  }
+}
+
+// ── Settings Modal ─────────────────────────────────────────────────────────
+btnSettings.addEventListener('click', openSettings);
+
+async function openSettings() {
+  const modal = document.getElementById('settings-modal');
+  const resultSpan = document.getElementById('test-llm-result');
+  resultSpan.textContent = '';
+
+  try {
+    const resp = await fetch('/api/settings');
+    const settings = await resp.json();
+    document.getElementById('settings-llm-enabled').checked = settings.llm.enabled;
+    document.getElementById('settings-llm-endpoint').value = settings.llm.endpoint || '';
+    document.getElementById('settings-llm-apikey').value = settings.llm.apiKey || '';
+    document.getElementById('settings-llm-model').value = settings.llm.model || '';
+    document.getElementById('settings-llm-maxtokens').value = settings.llm.maxTokens || 1024;
+    document.getElementById('settings-llm-temperature').value = settings.llm.temperature ?? 0.1;
+    document.getElementById('settings-llm-concurrency').value = settings.llm.concurrency || 2;
+  } catch {
+    // Use defaults
+  }
+
+  modal.classList.add('active');
+}
+
+document.getElementById('btn-test-llm').addEventListener('click', async () => {
+  const resultSpan = document.getElementById('test-llm-result');
+  resultSpan.textContent = 'Testing...';
+  resultSpan.style.color = 'var(--muted)';
+
+  // Save current settings first so the test uses them
+  await saveCurrentSettings();
+
+  try {
+    const resp = await fetch('/api/settings/test-llm', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      resultSpan.textContent = 'Connected! Response: ' + data.response;
+      resultSpan.style.color = 'var(--green)';
+    } else {
+      resultSpan.textContent = 'Failed: ' + data.error;
+      resultSpan.style.color = 'var(--red)';
+    }
+  } catch (err) {
+    resultSpan.textContent = 'Error: ' + err.message;
+    resultSpan.style.color = 'var(--red)';
+  }
+});
+
+async function saveCurrentSettings() {
+  const tempVal = parseFloat(document.getElementById('settings-llm-temperature').value);
+  const settings = {
+    llm: {
+      enabled: document.getElementById('settings-llm-enabled').checked,
+      endpoint: document.getElementById('settings-llm-endpoint').value.trim(),
+      apiKey: document.getElementById('settings-llm-apikey').value,
+      model: document.getElementById('settings-llm-model').value.trim(),
+      maxTokens: parseInt(document.getElementById('settings-llm-maxtokens').value) || 1024,
+      temperature: Number.isFinite(tempVal) ? tempVal : 0.1,
+      concurrency: parseInt(document.getElementById('settings-llm-concurrency').value) || 2,
+    },
+  };
+
+  const resp = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    let msg;
+    try { msg = JSON.parse(text).error; } catch { msg = text.slice(0, 200); }
+    throw new Error(msg || `HTTP ${resp.status}`);
+  }
+  return resp.json();
+}
+
+document.getElementById('btn-detect-concurrency').addEventListener('click', async () => {
+  const resultSpan = document.getElementById('detect-concurrency-result');
+  resultSpan.textContent = 'Detecting...';
+  resultSpan.style.color = 'var(--muted)';
+
+  // Save current settings first so the backend has the latest endpoint/model/apiKey
+  try {
+    await saveCurrentSettings();
+  } catch (err) {
+    resultSpan.textContent = 'Save failed: ' + err.message;
+    resultSpan.style.color = 'var(--red)';
+    return;
+  }
+
+  try {
+    const resp = await fetch('/api/settings/detect-concurrency');
+    const data = await resp.json();
+    if (data.success) {
+      document.getElementById('settings-llm-concurrency').value = data.instances;
+      const label = data.instances === 1 ? 'instance' : 'instances';
+      resultSpan.textContent = `Detected ${data.instances} ${label}`;
+      resultSpan.style.color = 'var(--green)';
+    } else {
+      resultSpan.textContent = data.error || 'Detection failed';
+      resultSpan.style.color = 'var(--red)';
+    }
+  } catch (err) {
+    resultSpan.textContent = 'Error: ' + err.message;
+    resultSpan.style.color = 'var(--red)';
+  }
+});
+
+document.getElementById('btn-save-settings').addEventListener('click', async () => {
+  try {
+    await saveCurrentSettings();
+    closeModal('settings-modal');
+    await loadLlmState();
+  } catch (err) {
+    alert('Failed to save settings: ' + err.message);
+  }
+});
 
 async function loadInstanceInfo() {
   try {
@@ -187,6 +324,7 @@ function startScan() {
   const params = new URLSearchParams();
   if (optNoCache.checked) params.set('noCache', 'true');
   if (optChangelogs.checked) params.set('checkChangelogs', 'true');
+  if (optLlm.checked) params.set('useLlm', 'true');
   const limit = parseInt(optLimit.value) || 0;
   if (limit > 0) params.set('limit', String(limit));
 
@@ -292,7 +430,16 @@ function renderRow(item, cssClass, showActions) {
   let change = item.breakingReason
     ? esc(item.breakingReason)
     : item.hasUpdate ? 'Update available' : 'Up to date';
-  if (item.flaggedChangelogs && item.flaggedChangelogs.length > 0) {
+  if (item.llmChangelogs && item.llmChangelogs.length > 0) {
+    // Show worst severity badge
+    const severities = item.llmChangelogs.map(e => e.llmAnalysis?.severity || 'safe');
+    let worst = 'safe';
+    if (severities.includes('breaking')) worst = 'breaking';
+    else if (severities.includes('caution')) worst = 'caution';
+    const badgeLabel = worst.toUpperCase();
+    const escapedName = esc(item.name).replace(/'/g, "\\'");
+    change = `<span class="llm-badge llm-badge-${worst}" onclick="showFlaggedChangelogs(${item.addonID}, '${escapedName}')">${badgeLabel}</span> ${change}`;
+  } else if (item.flaggedChangelogs && item.flaggedChangelogs.length > 0) {
     const n = item.flaggedChangelogs.length;
     change = `<span class="changelog-warn" onclick="showFlaggedChangelogs(${item.addonID}, '${esc(item.name).replace(/'/g, "\\'")}')">&#9888;${n}</span> ${change}`;
   }
@@ -463,8 +610,6 @@ function showFlaggedChangelogs(addonId, modName) {
   const title = document.getElementById('changelog-modal-title');
   const body = document.getElementById('changelog-modal-body');
 
-  title.textContent = `Flagged Changelogs: ${modName}`;
-
   // Find the item across all categories
   let item = null;
   if (scanResults) {
@@ -475,6 +620,44 @@ function showFlaggedChangelogs(addonId, modName) {
       if (item) break;
     }
   }
+
+  // LLM results mode
+  if (item && item.llmChangelogs && item.llmChangelogs.length > 0) {
+    title.textContent = `LLM Analysis: ${modName}`;
+    let html = '';
+    for (const entry of item.llmChangelogs) {
+      const date = new Date(entry.fileDate).toLocaleDateString();
+      const analysis = entry.llmAnalysis || {};
+      const sev = analysis.severity || 'safe';
+      const sevBadge = `<span class="llm-badge llm-badge-${sev}">${sev.toUpperCase()}</span>`;
+      html += `<div class="changelog-version">`;
+      html += `<div class="changelog-version-header" onclick="this.parentElement.classList.toggle('open')">`;
+      html += `<span style="color:var(--text);font-weight:600">${esc(entry.fileName)}</span>`;
+      html += `<span style="color:var(--muted);font-size:0.8rem">${date}</span>`;
+      html += sevBadge;
+      html += `</div>`;
+      html += `<div class="changelog-version-body">`;
+      if (analysis.summary) {
+        html += `<div class="llm-summary">${esc(analysis.summary)}</div>`;
+      }
+      if (analysis.breakingItems && analysis.breakingItems.length > 0) {
+        html += '<ul class="llm-breaking-items">';
+        for (const bi of analysis.breakingItems) {
+          html += `<li>${esc(bi)}</li>`;
+        }
+        html += '</ul>';
+      }
+      html += `<details style="margin-top:0.5rem"><summary style="cursor:pointer;color:var(--muted);font-size:0.8rem">Show changelog</summary><div style="margin-top:0.4rem">${entry.changelogHtml}</div></details>`;
+      html += `</div>`;
+      html += `</div>`;
+    }
+    body.innerHTML = html;
+    modal.classList.add('active');
+    return;
+  }
+
+  // Keyword results mode
+  title.textContent = `Flagged Changelogs: ${modName}`;
 
   if (!item || !item.flaggedChangelogs || item.flaggedChangelogs.length === 0) {
     body.innerHTML = '<p style="color:var(--muted)">No flagged changelogs found.</p>';

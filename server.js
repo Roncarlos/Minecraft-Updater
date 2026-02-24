@@ -1,9 +1,10 @@
 import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { PORT, INSTANCES_ROOT, DEFAULT_INSTANCE } from './lib/config.js';
+import { PORT, INSTANCES_ROOT } from './lib/config.js';
 import { listInstances, loadInstance, scanConfigRefs, scanQuestRefs, runScan } from './lib/scanner.js';
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
+import { loadSettings, saveSettings } from './lib/settings.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -12,7 +13,7 @@ app.use(express.json());
 app.use(express.static(join(__dirname, 'public')));
 
 // ── State ──────────────────────────────────────────────────────────────────
-let selectedInstancePath = join(INSTANCES_ROOT, DEFAULT_INSTANCE);
+let selectedInstancePath = null;
 let lastScanResults = null;
 let scanRunning = false;
 let lastConfigRefs = {};
@@ -86,6 +87,19 @@ app.get('/api/scan/stream', async (req, res) => {
   const noCache = req.query.noCache === 'true';
   const limit = parseInt(req.query.limit) || 0;
   const checkChangelogs = req.query.checkChangelogs === 'true';
+  const useLlm = req.query.useLlm === 'true';
+
+  let scanOptions = { noCache, limit, checkChangelogs };
+
+  if (useLlm) {
+    try {
+      const settings = await loadSettings();
+      if (settings.llm.enabled && settings.llm.endpoint && settings.llm.model) {
+        scanOptions.useLlm = true;
+        scanOptions.settings = settings;
+      }
+    } catch { /* fall back to keyword mode */ }
+  }
 
   try {
     const { allAddons } = await loadInstance(selectedInstancePath);
@@ -94,7 +108,7 @@ app.get('/api/scan/stream', async (req, res) => {
     const { questRefFiles } = await scanQuestRefs(selectedInstancePath, allAddons);
     lastQuestRefs = questRefFiles;
 
-    const results = await runScan(selectedInstancePath, { noCache, limit, checkChangelogs }, (event) => {
+    const results = await runScan(selectedInstancePath, scanOptions, (event) => {
       if (event.type === 'progress') {
         send('progress', event);
       } else if (event.type === 'status') {
@@ -230,7 +244,161 @@ app.get('/api/download-state', (req, res) => {
   res.json(getDownloadState());
 });
 
-// ── Start ──────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`Mod Update Manager running at http://localhost:${PORT}`);
+// ── GET /api/settings ───────────────────────────────────────────────────────
+app.get('/api/settings', async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    // Mask API key for client
+    const masked = { ...settings, llm: { ...settings.llm } };
+    if (masked.llm.apiKey) {
+      masked.llm.apiKey = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    }
+    res.json(masked);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
+
+// ── POST /api/settings ─────────────────────────────────────────────────────
+app.post('/api/settings', async (req, res) => {
+  try {
+    const incoming = req.body;
+    // Preserve existing API key when masked placeholder received
+    if (incoming.llm && incoming.llm.apiKey === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022') {
+      const current = await loadSettings();
+      incoming.llm.apiKey = current.llm.apiKey;
+    }
+    const saved = await saveSettings(incoming);
+    // Return masked version
+    const masked = { ...saved, llm: { ...saved.llm } };
+    if (masked.llm.apiKey) {
+      masked.llm.apiKey = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+    }
+    res.json(masked);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/settings/test-llm ────────────────────────────────────────────
+app.post('/api/settings/test-llm', async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    const { endpoint, apiKey, model } = settings.llm;
+    if (!endpoint || !model) {
+      res.status(400).json({ error: 'LLM endpoint and model must be configured' });
+      return;
+    }
+
+    const headers = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'Respond with the word "ok".' }],
+          max_tokens: 16,
+          temperature: 0,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        return;
+      }
+
+      const data = await resp.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      res.json({ success: true, response: content.slice(0, 100) });
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      res.json({ success: false, error: fetchErr.message });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── GET /api/settings/detect-concurrency ─────────────────────────────────
+app.get('/api/settings/detect-concurrency', async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    const { endpoint, apiKey, model } = settings.llm;
+    if (!endpoint || !model) {
+      res.json({ success: false, error: 'LLM endpoint and model must be configured' });
+      return;
+    }
+
+    // Derive models URL: replace /chat/completions at end of endpoint with /models
+    const modelsUrl = endpoint.replace(/\/chat\/completions\/?$/, '/models');
+    if (modelsUrl === endpoint) {
+      res.json({ success: false, error: 'Cannot derive models URL from endpoint (expected /chat/completions suffix)' });
+      return;
+    }
+
+    const headers = {};
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const resp = await fetch(modelsUrl, { headers, signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        return;
+      }
+
+      const body = await resp.json();
+      const allModels = body.data || [];
+
+      // Strip any :N suffix from the configured model name to get the base name
+      const baseName = model.replace(/:\d+$/, '');
+
+      // Count models whose id, after stripping :N, matches the base name
+      const matching = allModels.filter(m => {
+        const id = (m.id || '').replace(/:\d+$/, '');
+        return id === baseName;
+      });
+
+      res.json({ success: true, instances: matching.length, models: matching.map(m => m.id) });
+    } catch (fetchErr) {
+      clearTimeout(timeout);
+      res.json({ success: false, error: fetchErr.message });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Start ──────────────────────────────────────────────────────────────────
+(async () => {
+  // Auto-select first available instance
+  try {
+    const instances = await listInstances();
+    if (instances.length > 0) {
+      selectedInstancePath = instances[0].path;
+      console.log(`Auto-selected instance: ${instances[0].name}`);
+    } else {
+      console.warn('No CurseForge instances found in', INSTANCES_ROOT);
+    }
+  } catch (err) {
+    console.warn('Failed to auto-detect instances:', err.message);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Mod Update Manager running at http://localhost:${PORT}`);
+  });
+})();

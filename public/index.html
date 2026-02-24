@@ -40,6 +40,8 @@
   <label><input type="checkbox" id="opt-nocache"> No Cache</label>
   <label><input type="checkbox" id="opt-changelogs"> Check Changelogs</label>
   <label>Limit: <input type="number" id="opt-limit" min="0" value="0" placeholder="0=all"></label>
+  <label><input type="checkbox" id="opt-llm" disabled> LLM Analysis</label>
+  <button class="btn btn-settings" id="btn-settings">&#9881;</button>
 </div>
 
 <div class="progress-container" id="progress-container">
@@ -106,6 +108,56 @@
     <div class="modal-footer">
       <button class="btn btn-cancel" onclick="closeModal('apply-modal')">Cancel</button>
       <button class="btn btn-confirm" id="apply-modal-confirm">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="max-width:550px">
+    <h3>Settings</h3>
+    <div class="modal-body">
+      <div class="settings-section">
+        <h4>LLM Analysis</h4>
+        <div class="settings-field">
+          <label for="settings-llm-enabled">Enabled</label>
+          <input type="checkbox" id="settings-llm-enabled">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-endpoint">Endpoint</label>
+          <input type="text" id="settings-llm-endpoint" placeholder="http://localhost:1234/v1/chat/completions">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-apikey">API Key</label>
+          <input type="password" id="settings-llm-apikey" placeholder="Optional">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-model">Model</label>
+          <input type="text" id="settings-llm-model" placeholder="Model name">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-maxtokens">Max Tokens</label>
+          <input type="number" id="settings-llm-maxtokens" min="64" max="4096" value="1024">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-temperature">Temperature</label>
+          <input type="number" id="settings-llm-temperature" min="0" max="2" step="0.1" value="0.1">
+        </div>
+        <div class="settings-field">
+          <label for="settings-llm-concurrency">Concurrency</label>
+          <input type="number" id="settings-llm-concurrency" min="1" max="10" value="2">
+          <button class="btn btn-download" id="btn-detect-concurrency">Detect</button>
+          <span id="detect-concurrency-result" style="font-size:0.85rem;color:var(--muted)"></span>
+        </div>
+        <div class="settings-field">
+          <button class="btn btn-download" id="btn-test-llm">Test Connection</button>
+          <span id="test-llm-result" style="font-size:0.85rem;color:var(--muted)"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal('settings-modal')">Cancel</button>
+      <button class="btn btn-confirm" id="btn-save-settings">Save</button>
     </div>
   </div>
 </div>
