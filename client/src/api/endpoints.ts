@@ -23,6 +23,9 @@ export const fetchInstance = () =>
 export const fetchScanResults = () =>
   get<import('../types').ScanResults>('/api/scan/results');
 
+export const cancelScan = () =>
+  post<{ success: boolean }>('/api/scan/cancel', {});
+
 // ── Config refs ────────────────────────────────────────────────────────────
 
 export const fetchConfigRefs = (addonId: number) =>

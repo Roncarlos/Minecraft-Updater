@@ -19,6 +19,7 @@ let selectedInstancePath = null;
 let lastScanResults = null;
 let lastScanVersion = null;
 let scanRunning = false;
+let scanAbortController = null;
 let lastConfigRefs = {};
 let lastRefSeverity = {};
 
@@ -77,6 +78,8 @@ app.get('/api/scan/stream', async (req, res) => {
     return;
   }
   scanRunning = true;
+  scanAbortController = new AbortController();
+  const { signal } = scanAbortController;
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -84,7 +87,15 @@ app.get('/api/scan/stream', async (req, res) => {
     'Connection': 'keep-alive',
   });
 
+  // Track client disconnect to avoid writing to a dead connection
+  let clientDisconnected = false;
+  req.on('close', () => {
+    clientDisconnected = true;
+    if (scanAbortController) scanAbortController.abort();
+  });
+
   const send = (event, data) => {
+    if (clientDisconnected) return;
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
@@ -93,7 +104,7 @@ app.get('/api/scan/stream', async (req, res) => {
   const checkChangelogs = req.query.checkChangelogs === 'true';
   const useLlm = req.query.useLlm === 'true';
 
-  let scanOptions = { noCache, limit, checkChangelogs };
+  let scanOptions = { noCache, limit, checkChangelogs, signal };
 
   if (useLlm) {
     try {
@@ -112,22 +123,45 @@ app.get('/api/scan/stream', async (req, res) => {
     lastRefSeverity = refSeverity;
     lastScanVersion = CACHE_VERSION;
 
-    const results = await runScan(selectedInstancePath, scanOptions, (event) => {
+    let scanResults = null;
+    await runScan(selectedInstancePath, scanOptions, (event) => {
       if (event.type === 'progress') {
         send('progress', event);
       } else if (event.type === 'status') {
         send('status', event);
       } else if (event.type === 'done') {
-        lastScanResults = event.results;
-        send('done', event.results);
+        scanResults = event.results;
       }
     });
+
+    if (scanResults) lastScanResults = scanResults;
+
+    if (signal.aborted) {
+      send('cancelled', { reason: 'Scan cancelled' });
+    } else {
+      send('done', scanResults);
+    }
   } catch (err) {
-    send('error', { error: err.message });
+    if (signal.aborted) {
+      send('cancelled', { reason: 'Scan cancelled' });
+    } else {
+      send('error', { error: err.message });
+    }
   } finally {
     scanRunning = false;
+    scanAbortController = null;
     res.end();
   }
+});
+
+// ── POST /api/scan/cancel ─────────────────────────────────────────────────
+app.post('/api/scan/cancel', (req, res) => {
+  if (!scanRunning || !scanAbortController) {
+    res.status(409).json({ error: 'No scan in progress' });
+    return;
+  }
+  scanAbortController.abort();
+  res.json({ success: true });
 });
 
 // ── GET /api/scan/results ──────────────────────────────────────────────────

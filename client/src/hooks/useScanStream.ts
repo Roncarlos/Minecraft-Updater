@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppContext } from '../context';
+import { cancelScan as cancelScanApi } from '../api/endpoints';
 import type { ScanProgress, ScanResults } from '../types';
 
 interface ScanOptions {
@@ -60,6 +61,13 @@ export function useScanStream() {
       dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
     });
 
+    es.addEventListener('cancelled', () => {
+      es.close();
+      esRef.current = null;
+      dispatch({ type: 'SET_SCAN_RUNNING', value: false });
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
+    });
+
     es.addEventListener('error', () => {
       es.close();
       esRef.current = null;
@@ -67,5 +75,20 @@ export function useScanStream() {
     });
   }, [dispatch]);
 
-  return { startScan, scanRunning: state.scanRunning };
+  const cancelScan = useCallback(async () => {
+    // Show immediate feedback while waiting for server to finish current work
+    dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current: 0, total: 0, modName: 'Cancelling...', source: '' } });
+    try {
+      await cancelScanApi();
+      // Server will send 'cancelled' SSE event → handled by the listener above
+    } catch {
+      // POST failed (e.g. scan already finished) — force cleanup as fallback
+      esRef.current?.close();
+      esRef.current = null;
+      dispatch({ type: 'SET_SCAN_RUNNING', value: false });
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
+    }
+  }, [dispatch]);
+
+  return { startScan, cancelScan, scanRunning: state.scanRunning };
 }

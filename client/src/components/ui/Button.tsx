@@ -5,6 +5,7 @@ const variantClasses = {
   rollback: 'bg-warning-bg text-warning border border-warning',
   cancel: 'bg-surface text-muted border border-border',
   confirm: 'bg-success-bg text-success border border-success',
+  danger: 'bg-danger-bg text-danger border border-danger',
   settings: 'bg-surface text-muted border border-border hover:text-text hover:border-muted',
 } as const;
 

@@ -7,7 +7,7 @@ import NumberInput from '../ui/NumberInput';
 
 export default function ControlsBar() {
   const { state, openModal } = useAppContext();
-  const { startScan, scanRunning } = useScanStream();
+  const { startScan, cancelScan, scanRunning } = useScanStream();
   const [noCache, setNoCache] = useState(false);
   const [checkChangelogs, setCheckChangelogs] = useState(false);
   const [useLlm, setUseLlm] = useState(false);
@@ -22,6 +22,11 @@ export default function ControlsBar() {
       <Button onClick={handleScan} disabled={scanRunning}>
         Scan for Updates
       </Button>
+      {scanRunning && (
+        <Button variant="danger" onClick={cancelScan}>
+          Cancel
+        </Button>
+      )}
       <Checkbox label="No Cache" checked={noCache} onChange={setNoCache} />
       <Checkbox label="Check Changelogs" checked={checkChangelogs} onChange={setCheckChangelogs} />
       <NumberInput label="Limit:" value={limit} onChange={setLimit} min={0} placeholder="0=all" />
