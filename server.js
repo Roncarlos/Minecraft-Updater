@@ -7,6 +7,7 @@ import { PORT, INSTANCES_ROOT, CACHE_VERSION } from './lib/config.js';
 import { listInstances, loadInstance, scanConfigRefs, runScan, pruneCache } from './lib/scanner.js';
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
+import { buildReport } from './lib/report.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -487,6 +488,15 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── GET /api/report ──────────────────────────────────────────────────────
+app.get('/api/report', (req, res) => {
+  if (!lastScanResults || lastScanVersion !== CACHE_VERSION) {
+    res.status(404).json({ error: 'No scan results available. Run a scan first.' });
+    return;
+  }
+  res.json(buildReport(lastScanResults, lastConfigRefs, lastRefSeverity));
 });
 
 // SPA fallback — must come after all /api routes
