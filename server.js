@@ -195,7 +195,7 @@ app.post('/api/open-file', async (req, res) => {
   if (hasVSCode) {
     const lineNum = typeof line === 'number' && line > 0 ? line : 1;
     bin = 'code';
-    args = ['--goto', `${absPath}:${lineNum}`];
+    args = ['--goto', `"${absPath}:${lineNum}"`];
   } else {
     const platform = process.platform;
     if (platform === 'win32') {
@@ -210,7 +210,9 @@ app.post('/api/open-file', async (req, res) => {
     }
   }
 
-  execFile(bin, args, (err) => {
+  // code is a .cmd on Windows, so it needs shell: true to resolve
+  const opts = hasVSCode && process.platform === 'win32' ? { shell: true } : {};
+  execFile(bin, args, opts, (err) => {
     if (err) {
       res.status(500).json({ error: `Failed to open file: ${err.message}` });
       return;
