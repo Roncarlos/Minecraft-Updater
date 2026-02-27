@@ -2,7 +2,7 @@ import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { PORT, INSTANCES_ROOT } from './lib/config.js';
-import { listInstances, loadInstance, scanConfigRefs, runScan } from './lib/scanner.js';
+import { listInstances, loadInstance, scanConfigRefs, runScan, pruneCache } from './lib/scanner.js';
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 
@@ -383,6 +383,13 @@ app.get('/{*path}', (req, res) => {
 
 // ── Start ──────────────────────────────────────────────────────────────────
 (async () => {
+  // Prune stale cache entries on startup
+  try {
+    await pruneCache();
+  } catch (err) {
+    console.warn('Cache prune failed:', err.message);
+  }
+
   // Auto-select first available instance
   try {
     const instances = await listInstances();

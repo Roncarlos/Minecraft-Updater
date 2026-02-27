@@ -116,8 +116,14 @@ export interface LlmSettings {
   concurrency: number;
 }
 
+export interface CacheSettings {
+  maxAgeHours: number;
+  pruneDays: number;
+}
+
 export interface Settings {
   llm: LlmSettings;
+  cache: CacheSettings;
 }
 
 // ── Refs ───────────────────────────────────────────────────────────────────
