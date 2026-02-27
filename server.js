@@ -2,7 +2,7 @@ import express from 'express';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { PORT, INSTANCES_ROOT } from './lib/config.js';
-import { listInstances, loadInstance, scanConfigRefs, scanQuestRefs, runScan } from './lib/scanner.js';
+import { listInstances, loadInstance, scanConfigRefs, runScan } from './lib/scanner.js';
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 
@@ -17,7 +17,7 @@ let selectedInstancePath = null;
 let lastScanResults = null;
 let scanRunning = false;
 let lastConfigRefs = {};
-let lastQuestRefs = {};
+let lastRefSeverity = {};
 
 // ── GET /api/instances ─────────────────────────────────────────────────────
 app.get('/api/instances', async (req, res) => {
@@ -49,7 +49,7 @@ app.post('/api/instance/select', async (req, res) => {
     // Clear stale results from previous profile
     lastScanResults = null;
     lastConfigRefs = {};
-    lastQuestRefs = {};
+    lastRefSeverity = {};
     res.json({ instanceName: data.instanceName, mcVersion: data.mcVersion, loaderName: data.loaderName, modCount: data.allAddons.length });
   } catch (err) {
     res.status(400).json({ error: `Failed to load instance: ${err.message}` });
@@ -103,10 +103,9 @@ app.get('/api/scan/stream', async (req, res) => {
 
   try {
     const { allAddons } = await loadInstance(selectedInstancePath);
-    const { refFiles } = await scanConfigRefs(selectedInstancePath, allAddons);
+    const { refFiles, refSeverity } = await scanConfigRefs(selectedInstancePath, allAddons);
     lastConfigRefs = refFiles;
-    const { questRefFiles } = await scanQuestRefs(selectedInstancePath, allAddons);
-    lastQuestRefs = questRefFiles;
+    lastRefSeverity = refSeverity;
 
     const results = await runScan(selectedInstancePath, scanOptions, (event) => {
       if (event.type === 'progress') {
@@ -139,14 +138,8 @@ app.get('/api/scan/results', (req, res) => {
 app.get('/api/config-refs/:addonId', (req, res) => {
   const addonId = req.params.addonId;
   const files = lastConfigRefs[addonId] || [];
-  res.json({ addonId, files });
-});
-
-// ── GET /api/quest-refs/:addonId ────────────────────────────────────────────
-app.get('/api/quest-refs/:addonId', (req, res) => {
-  const addonId = req.params.addonId;
-  const files = lastQuestRefs[addonId] || [];
-  res.json({ addonId, files });
+  const severity = lastRefSeverity[addonId] || null;
+  res.json({ addonId, files, severity });
 });
 
 // ── POST /api/download ─────────────────────────────────────────────────────

@@ -289,20 +289,16 @@ tr.row-ok td:first-child       { border-left: 3px solid var(--green); }
 a { color: var(--blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ── Config ref link ────────────────────────────────────────────────────── */
-.config-ref-link {
+/* ── Ref link (severity-colored) ────────────────────────────────────────── */
+.ref-link {
   cursor: pointer;
   border-bottom: 1px dotted var(--muted);
-  color: var(--blue);
+  color: var(--muted);
 }
-.config-ref-link:hover { color: var(--cyan); }
-
-.quest-ref-link {
-  cursor: pointer;
-  border-bottom: 1px dotted var(--yellow);
-  color: var(--yellow);
-}
-.quest-ref-link:hover { color: var(--cyan); }
+.ref-link:hover { color: var(--cyan); }
+.ref-link.ref-severity-high { color: var(--red); border-color: var(--red); }
+.ref-link.ref-severity-medium { color: var(--orange); border-color: var(--orange); }
+.ref-link.ref-severity-low { color: var(--muted); border-color: var(--muted); }
 
 .dep-link {
   cursor: pointer;
@@ -423,6 +419,18 @@ a:hover { text-decoration: underline; }
 }
 .modal-body li:last-child { border-bottom: none; }
 .modal-body li:hover { background: var(--bg); }
+.ref-tier-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.5rem 0.6rem 0.25rem;
+  margin-top: 0.5rem;
+}
+.ref-tier-header:first-child { margin-top: 0; }
+.ref-tier-header-high { color: var(--red); }
+.ref-tier-header-medium { color: var(--orange); }
+.ref-tier-header-low { color: var(--muted); }
 .modal-footer {
   display: flex;
   justify-content: flex-end;

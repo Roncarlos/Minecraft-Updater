@@ -418,7 +418,7 @@ function renderSection(title, cssClass, items, showActions) {
   }
   html += `</h2>`;
   html += '<div class="section-body">';
-  html += '<table><thead><tr><th>Mod</th><th>Installed</th><th>Available</th><th>Config Refs</th><th>Quest Refs</th><th>Deps</th><th>Status</th>';
+  html += '<table><thead><tr><th>Mod</th><th>Installed</th><th>Available</th><th>Refs</th><th>Deps</th><th>Status</th>';
   if (showActions) html += '<th>Actions</th>';
   html += '</tr></thead><tbody>';
 
@@ -458,12 +458,10 @@ function renderRow(item, cssClass, showActions) {
     change = `<span class="changelog-warn" onclick="showFlaggedChangelogs(${item.addonID}, '${esc(item.name).replace(/'/g, "\\'")}')">&#9888;${n}</span> ${change}`;
   }
 
-  const refsHtml = item.configRefs > 0
-    ? `<span class="config-ref-link" onclick="showConfigRefs(${item.addonID}, '${esc(item.name)}')">${item.configRefs}</span>`
-    : '0';
-
-  const questRefsHtml = item.questRefs > 0
-    ? `<span class="quest-ref-link" onclick="showQuestRefs(${item.addonID}, '${esc(item.name)}')">${item.questRefs}</span>`
+  const refCount = item.refs || 0;
+  const refTier = item.refSeverity ? item.refSeverity.severity : '';
+  const refsHtml = refCount > 0
+    ? `<span class="ref-link ref-severity-${refTier}" onclick="showRefs(${item.addonID}, '${esc(item.name)}')">${refCount}</span>`
     : '0';
 
   // Deps cell
@@ -502,16 +500,16 @@ function renderRow(item, cssClass, showActions) {
     actionsHtml = '<td></td>';
   }
 
-  return `<tr class="row-${cssClass}" data-addon="${item.addonID}"><td>${name}</td><td>${installed}</td><td>${latest}</td><td>${refsHtml}</td><td>${questRefsHtml}</td><td>${depsHtml}</td><td>${change}</td>${actionsHtml}</tr>`;
+  return `<tr class="row-${cssClass}" data-addon="${item.addonID}"><td>${name}</td><td>${installed}</td><td>${latest}</td><td>${refsHtml}</td><td>${depsHtml}</td><td>${change}</td>${actionsHtml}</tr>`;
 }
 
-// ── Config Refs Modal ──────────────────────────────────────────────────────
-async function showConfigRefs(addonId, modName) {
-  const modal = document.getElementById('config-modal');
-  const title = document.getElementById('config-modal-title');
-  const body = document.getElementById('config-modal-body');
+// ── Refs Modal (unified, severity-grouped) ──────────────────────────────────
+async function showRefs(addonId, modName) {
+  const modal = document.getElementById('refs-modal');
+  const title = document.getElementById('refs-modal-title');
+  const body = document.getElementById('refs-modal-body');
 
-  title.textContent = `Config References: ${modName}`;
+  title.textContent = `References: ${modName}`;
   body.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
   modal.classList.add('active');
 
@@ -519,40 +517,54 @@ async function showConfigRefs(addonId, modName) {
     const resp = await fetch(`/api/config-refs/${addonId}`);
     const data = await resp.json();
     if (data.files.length === 0) {
-      body.innerHTML = '<p style="color:var(--muted)">No config references found.</p>';
-    } else {
-      body.innerHTML = '<ul>' + data.files.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
+      body.innerHTML = '<p style="color:var(--muted)">No references found.</p>';
+      return;
     }
+
+    // Group files by severity tier
+    const tiers = { high: [], medium: [], low: [] };
+    const severityRules = [
+      { pattern: /kubejs\/server_scripts\//i, tier: 'high' },
+      { pattern: /kubejs\/startup_scripts\//i, tier: 'high' },
+      { pattern: /^scripts\//i, tier: 'high' },
+      { pattern: /datapacks?\//i, tier: 'high' },
+      { pattern: /config\/(ftbquests|betterquesting|heracles)\//i, tier: 'high' },
+      { pattern: /kubejs\/client_scripts\//i, tier: 'medium' },
+      { pattern: /config\/openloader\//i, tier: 'medium' },
+      { pattern: /patchouli_books\//i, tier: 'medium' },
+      { pattern: /config\//i, tier: 'medium' },
+      { pattern: /defaultconfigs\//i, tier: 'medium' },
+      { pattern: /resourcepacks\//i, tier: 'low' },
+    ];
+
+    for (const file of data.files) {
+      let tier = 'medium';
+      for (const rule of severityRules) {
+        if (rule.pattern.test(file)) { tier = rule.tier; break; }
+      }
+      tiers[tier].push(file);
+    }
+
+    let html = '';
+    if (tiers.high.length > 0) {
+      html += `<div class="ref-tier-header ref-tier-header-high">High Risk (${tiers.high.length} files)</div>`;
+      html += '<ul>' + tiers.high.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
+    }
+    if (tiers.medium.length > 0) {
+      html += `<div class="ref-tier-header ref-tier-header-medium">Medium Risk (${tiers.medium.length} files)</div>`;
+      html += '<ul>' + tiers.medium.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
+    }
+    if (tiers.low.length > 0) {
+      html += `<div class="ref-tier-header ref-tier-header-low">Low Risk (${tiers.low.length} files)</div>`;
+      html += '<ul>' + tiers.low.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
+    }
+
+    body.innerHTML = html;
   } catch {
-    body.innerHTML = '<p style="color:var(--red)">Failed to load config references.</p>';
+    body.innerHTML = '<p style="color:var(--red)">Failed to load references.</p>';
   }
 }
-window.showConfigRefs = showConfigRefs;
-
-// ── Quest Refs Modal ────────────────────────────────────────────────────────
-async function showQuestRefs(addonId, modName) {
-  const modal = document.getElementById('quest-modal');
-  const title = document.getElementById('quest-modal-title');
-  const body = document.getElementById('quest-modal-body');
-
-  title.textContent = `Quest References: ${modName}`;
-  body.innerHTML = '<p style="color:var(--muted)">Loading...</p>';
-  modal.classList.add('active');
-
-  try {
-    const resp = await fetch(`/api/quest-refs/${addonId}`);
-    const data = await resp.json();
-    if (data.files.length === 0) {
-      body.innerHTML = '<p style="color:var(--muted)">No quest references found.</p>';
-    } else {
-      body.innerHTML = '<p style="color:var(--yellow);margin-bottom:0.8rem;font-size:0.85rem">This mod is referenced in quest files. Updating may affect quest rewards, tasks, or icons.</p>'
-        + '<ul>' + data.files.map(f => `<li>${esc(f)}</li>`).join('') + '</ul>';
-    }
-  } catch {
-    body.innerHTML = '<p style="color:var(--red)">Failed to load quest references.</p>';
-  }
-}
-window.showQuestRefs = showQuestRefs;
+window.showRefs = showRefs;
 
 // ── Dependencies Modal ─────────────────────────────────────────────────────
 function showDeps(addonId, modName) {

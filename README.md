@@ -8,7 +8,7 @@ A web-based tool for managing Minecraft mod updates across CurseForge instances.
 
 - **Multi-instance support** — Auto-detects all CurseForge instances and lets you switch between profiles
 - **Smart categorization** — Sorts mods into 6 buckets: Breaking, Caution, Review Deps, Safe to Update, Updates Available, and Up to Date
-- **Config & quest scanning** — Detects which mods are referenced in config files, KubeJS scripts, and quest files (FTB Quests, Better Questing, Heracles)
+- **Unified reference scanning** — Scans configs, KubeJS scripts, CraftTweaker/GroovyScript, quests, datapacks, resource packs, and Patchouli books for mod references, classified by severity (high/medium/low)
 - **Dependency graph** — Builds a full dependency tree, warns about missing deps, and resolves transitive update chains
 - **LLM changelog analysis** — Optional AI-powered analysis that classifies changes as breaking, caution, or safe
 - **Keyword fallback** — When LLM is disabled, scans changelogs for breaking change keywords
@@ -65,8 +65,8 @@ After scanning, mods are sorted into 6 categories:
 
 | Category | Color | Meaning |
 |----------|-------|---------|
-| **Breaking Changes** | Red | LLM detected breaking changes, or version bump/keywords flagged AND config files reference this mod |
-| **Caution** | Orange | LLM detected caution-level changes, or version bump/keywords flagged with no config references |
+| **Breaking Changes** | Red | LLM detected breaking changes, or version bump/keywords flagged AND high-severity references (scripts, quests, datapacks) |
+| **Caution** | Orange | LLM detected caution-level changes, or version bump/keywords flagged with medium/low/no references |
 | **Review Deps** | Purple | The mod itself is safe, but one or more of its dependencies are in Breaking or Caution |
 | **Safe to Update** | Cyan | LLM confirmed safe — overrides version bump heuristics |
 | **Updates Available** | Yellow | Has an update, no flags triggered, no LLM result |
@@ -83,11 +83,19 @@ Click the deps count to open the dependency modal, where each dependency shows i
 
 ![Dependencies modal with warning icons](docs/images/deps-modal.png)
 
-### Config & Quest References
+### References
 
-Click the config refs or quest refs count to see exactly which files reference a mod. This helps you assess the impact of updating — mods referenced in many configs are riskier to update.
+Click the refs count to see which files reference a mod, grouped by severity tier:
 
-![Config references modal](docs/images/config-refs.png)
+| Tier | Color | Directories |
+|------|-------|-------------|
+| **High** | Red | KubeJS server/startup scripts, CraftTweaker/GroovyScript, datapacks, quest files (FTB Quests, Better Questing, Heracles) |
+| **Medium** | Orange | Config files, default configs, KubeJS client scripts, OpenLoader, Patchouli books |
+| **Low** | Muted | Resource packs |
+
+A mod's overall severity is its worst tier. This affects categorization — mods with high-severity refs and version bumps go to Breaking Changes, while mods with only low-severity refs go to Caution.
+
+![References modal](docs/images/config-refs.png)
 
 ### Changelog Analysis
 
@@ -193,8 +201,8 @@ The classification logic uses multiple signals in priority order:
    └─ "breaking" → Breaking Changes
 
 2. No LLM, but version bump or breaking keywords found?
-   ├─ Config refs > 0 → Breaking Changes
-   └─ Config refs = 0 → Caution
+   ├─ High-severity refs → Breaking Changes
+   └─ Medium/low/no refs → Caution
 
 3. No flags at all?
    └─ Updates Available
@@ -254,8 +262,7 @@ minecraft-mod-updater/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/config-refs/:addonId` | List config files referencing a mod |
-| GET | `/api/quest-refs/:addonId` | List quest files referencing a mod |
+| GET | `/api/config-refs/:addonId` | List files referencing a mod (with severity breakdown) |
 
 ### Downloads & Updates
 
