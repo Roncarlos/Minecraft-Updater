@@ -130,7 +130,7 @@ export interface Settings {
 
 export interface RefsResponse {
   addonId: string;
-  files: string[];
+  files: Record<string, number[]>;
   severity: RefSeverity | null;
 }
 

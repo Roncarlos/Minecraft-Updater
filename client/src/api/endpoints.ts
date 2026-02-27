@@ -28,6 +28,11 @@ export const fetchScanResults = () =>
 export const fetchConfigRefs = (addonId: number) =>
   get<RefsResponse>(`/api/config-refs/${addonId}`);
 
+// ── Open file ─────────────────────────────────────────────────────────────
+
+export const openFile = (filePath: string) =>
+  post<{ success: boolean; error?: string }>('/api/open-file', { filePath });
+
 // ── Download ───────────────────────────────────────────────────────────────
 
 export const downloadMod = (addonId: number, downloadUrl: string, fileName: string) =>

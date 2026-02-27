@@ -1,7 +1,9 @@
 import express from 'express';
-import { join, dirname } from 'path';
+import { join, dirname, resolve, relative, isAbsolute } from 'path';
 import { fileURLToPath } from 'url';
-import { PORT, INSTANCES_ROOT } from './lib/config.js';
+import { access } from 'fs/promises';
+import { execFile } from 'child_process';
+import { PORT, INSTANCES_ROOT, CACHE_VERSION } from './lib/config.js';
 import { listInstances, loadInstance, scanConfigRefs, runScan, pruneCache } from './lib/scanner.js';
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
@@ -15,6 +17,7 @@ app.use(express.static(join(__dirname, 'client', 'dist')));
 // ── State ──────────────────────────────────────────────────────────────────
 let selectedInstancePath = null;
 let lastScanResults = null;
+let lastScanVersion = null;
 let scanRunning = false;
 let lastConfigRefs = {};
 let lastRefSeverity = {};
@@ -48,6 +51,7 @@ app.post('/api/instance/select', async (req, res) => {
     selectedInstancePath = newPath;
     // Clear stale results from previous profile
     lastScanResults = null;
+    lastScanVersion = null;
     lastConfigRefs = {};
     lastRefSeverity = {};
     res.json({ instanceName: data.instanceName, mcVersion: data.mcVersion, loaderName: data.loaderName, modCount: data.allAddons.length });
@@ -106,6 +110,7 @@ app.get('/api/scan/stream', async (req, res) => {
     const { refFiles, refSeverity } = await scanConfigRefs(selectedInstancePath, allAddons);
     lastConfigRefs = refFiles;
     lastRefSeverity = refSeverity;
+    lastScanVersion = CACHE_VERSION;
 
     const results = await runScan(selectedInstancePath, scanOptions, (event) => {
       if (event.type === 'progress') {
@@ -127,7 +132,7 @@ app.get('/api/scan/stream', async (req, res) => {
 
 // ── GET /api/scan/results ──────────────────────────────────────────────────
 app.get('/api/scan/results', (req, res) => {
-  if (!lastScanResults) {
+  if (!lastScanResults || lastScanVersion !== CACHE_VERSION) {
     res.status(404).json({ error: 'No scan results available. Run a scan first.' });
     return;
   }
@@ -136,10 +141,59 @@ app.get('/api/scan/results', (req, res) => {
 
 // ── GET /api/config-refs/:addonId ──────────────────────────────────────────
 app.get('/api/config-refs/:addonId', (req, res) => {
+  if (lastScanVersion !== CACHE_VERSION) {
+    res.json({ addonId: req.params.addonId, files: {}, severity: null });
+    return;
+  }
   const addonId = req.params.addonId;
-  const files = lastConfigRefs[addonId] || [];
+  const files = lastConfigRefs[addonId] || {};
   const severity = lastRefSeverity[addonId] || null;
   res.json({ addonId, files, severity });
+});
+
+// ── POST /api/open-file ─────────────────────────────────────────────────────
+app.post('/api/open-file', async (req, res) => {
+  const { filePath } = req.body;
+  if (typeof filePath !== 'string' || !filePath || !selectedInstancePath) {
+    res.status(400).json({ error: 'Missing filePath or no instance selected' });
+    return;
+  }
+
+  const absPath = resolve(selectedInstancePath, filePath);
+  // Validate the resolved path stays within the instance directory
+  const rel = relative(selectedInstancePath, absPath);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    res.status(400).json({ error: 'Path escapes instance directory' });
+    return;
+  }
+
+  try {
+    await access(absPath);
+  } catch {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const platform = process.platform;
+  let bin, args;
+  if (platform === 'win32') {
+    bin = 'cmd';
+    args = ['/c', 'start', '""', absPath];
+  } else if (platform === 'darwin') {
+    bin = 'open';
+    args = [absPath];
+  } else {
+    bin = 'xdg-open';
+    args = [absPath];
+  }
+
+  execFile(bin, args, (err) => {
+    if (err) {
+      res.status(500).json({ error: `Failed to open file: ${err.message}` });
+      return;
+    }
+    res.json({ success: true });
+  });
 });
 
 // ── POST /api/download ─────────────────────────────────────────────────────

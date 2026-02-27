@@ -24,10 +24,17 @@ export function classifyFile(filePath: string): 'high' | 'medium' | 'low' {
   return 'medium';
 }
 
-export function groupFilesByTier(files: string[]): { high: string[]; medium: string[]; low: string[] } {
-  const tiers = { high: [] as string[], medium: [] as string[], low: [] as string[] };
-  for (const file of files) {
-    tiers[classifyFile(file)].push(file);
+export interface FileRefEntry {
+  filePath: string;
+  lines: number[];
+}
+
+export function groupFilesByTier(
+  files: Record<string, number[]>
+): { high: FileRefEntry[]; medium: FileRefEntry[]; low: FileRefEntry[] } {
+  const tiers = { high: [] as FileRefEntry[], medium: [] as FileRefEntry[], low: [] as FileRefEntry[] };
+  for (const [filePath, lines] of Object.entries(files)) {
+    tiers[classifyFile(filePath)].push({ filePath, lines });
   }
   return tiers;
 }
