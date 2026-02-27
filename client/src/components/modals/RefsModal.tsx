@@ -10,10 +10,35 @@ interface RefsModalProps {
   modName: string;
 }
 
-function formatLines(lines: number[]): string {
-  const display = lines.slice(0, 5).map(n => `L${n}`).join(', ');
-  if (lines.length > 5) return `${display} +${lines.length - 5} more`;
-  return display;
+function LineLinks({ filePath, lines }: { filePath: string; lines: number[] }) {
+  const [errorLine, setErrorLine] = useState<number | null>(null);
+  const unique = [...new Set(lines)];
+  const visible = unique.slice(0, 5);
+  const extra = unique.length - visible.length;
+
+  const handleClick = (line: number) => {
+    setErrorLine(null);
+    openFile(filePath, line).catch(() => setErrorLine(line));
+  };
+
+  return (
+    <span className="shrink-0 flex items-baseline gap-1 flex-wrap justify-end">
+      {visible.map((n, i) => (
+        <span key={n}>
+          <button
+            type="button"
+            onClick={() => handleClick(n)}
+            className={`${errorLine === n ? 'text-danger' : 'text-muted hover:text-accent'} hover:underline cursor-pointer bg-transparent border-none p-0 font-mono text-[0.8rem]`}
+            title={errorLine === n ? `Failed to open ${filePath} at line ${n}` : `Open ${filePath} at line ${n}`}
+          >
+            L{n}
+          </button>
+          {i < visible.length - 1 || extra > 0 ? ',' : ''}
+        </span>
+      ))}
+      {extra > 0 && <span className="text-muted">+{extra} more</span>}
+    </span>
+  );
 }
 
 function FileEntry({ entry }: { entry: FileRefEntry }) {
@@ -21,7 +46,7 @@ function FileEntry({ entry }: { entry: FileRefEntry }) {
 
   const handleClick = () => {
     setOpenError(false);
-    openFile(entry.filePath).catch(() => setOpenError(true));
+    openFile(entry.filePath, entry.lines[0]).catch(() => setOpenError(true));
   };
 
   return (
@@ -36,7 +61,7 @@ function FileEntry({ entry }: { entry: FileRefEntry }) {
       </button>
       {openError && <span className="text-danger whitespace-nowrap shrink-0">Failed to open</span>}
       {!openError && entry.lines.length > 0 && (
-        <span className="text-muted whitespace-nowrap shrink-0">{formatLines(entry.lines)}</span>
+        <LineLinks filePath={entry.filePath} lines={entry.lines} />
       )}
     </li>
   );

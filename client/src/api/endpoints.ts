@@ -30,8 +30,8 @@ export const fetchConfigRefs = (addonId: number) =>
 
 // ── Open file ─────────────────────────────────────────────────────────────
 
-export const openFile = (filePath: string) =>
-  post<{ success: boolean; error?: string }>('/api/open-file', { filePath });
+export const openFile = (filePath: string, line?: number) =>
+  post<{ success: boolean; error?: string }>('/api/open-file', { filePath, line });
 
 // ── Download ───────────────────────────────────────────────────────────────
 

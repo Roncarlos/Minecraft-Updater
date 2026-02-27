@@ -151,9 +151,24 @@ app.get('/api/config-refs/:addonId', (req, res) => {
   res.json({ addonId, files, severity });
 });
 
+// ── VS Code availability (cached with TTL) ──────────────────────────────────
+let vsCodePromise = null;
+let vsCodeCheckedAt = 0;
+const VSCODE_CHECK_TTL = 5 * 60 * 1000; // 5 minutes
+
+function checkVSCode() {
+  if (vsCodePromise && Date.now() - vsCodeCheckedAt < VSCODE_CHECK_TTL) return vsCodePromise;
+  vsCodeCheckedAt = Date.now();
+  const cmd = process.platform === 'win32' ? 'where' : 'which';
+  vsCodePromise = new Promise((resolve) => {
+    execFile(cmd, ['code'], (err) => resolve(!err));
+  });
+  return vsCodePromise;
+}
+
 // ── POST /api/open-file ─────────────────────────────────────────────────────
 app.post('/api/open-file', async (req, res) => {
-  const { filePath } = req.body;
+  const { filePath, line } = req.body;
   if (typeof filePath !== 'string' || !filePath || !selectedInstancePath) {
     res.status(400).json({ error: 'Missing filePath or no instance selected' });
     return;
@@ -174,17 +189,25 @@ app.post('/api/open-file', async (req, res) => {
     return;
   }
 
-  const platform = process.platform;
+  const hasVSCode = await checkVSCode();
   let bin, args;
-  if (platform === 'win32') {
-    bin = 'cmd';
-    args = ['/c', 'start', '""', absPath];
-  } else if (platform === 'darwin') {
-    bin = 'open';
-    args = [absPath];
+
+  if (hasVSCode) {
+    const lineNum = typeof line === 'number' && line > 0 ? line : 1;
+    bin = 'code';
+    args = ['--goto', `${absPath}:${lineNum}`];
   } else {
-    bin = 'xdg-open';
-    args = [absPath];
+    const platform = process.platform;
+    if (platform === 'win32') {
+      bin = 'cmd';
+      args = ['/c', 'start', '""', absPath];
+    } else if (platform === 'darwin') {
+      bin = 'open';
+      args = [absPath];
+    } else {
+      bin = 'xdg-open';
+      args = [absPath];
+    }
   }
 
   execFile(bin, args, (err) => {
