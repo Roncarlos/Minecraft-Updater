@@ -1,0 +1,71 @@
+import { useCallback, useEffect, useRef } from 'react';
+import { useAppContext } from '../context';
+import type { ScanProgress, ScanResults } from '../types';
+
+interface ScanOptions {
+  noCache: boolean;
+  checkChangelogs: boolean;
+  useLlm: boolean;
+  limit: number;
+}
+
+export function useScanStream() {
+  const { state, dispatch } = useAppContext();
+  const esRef = useRef<EventSource | null>(null);
+  const scanRunningRef = useRef(false);
+
+  // Keep ref in sync with state
+  scanRunningRef.current = state.scanRunning;
+
+  // Clean up EventSource on unmount
+  useEffect(() => {
+    return () => {
+      esRef.current?.close();
+      esRef.current = null;
+    };
+  }, []);
+
+  const startScan = useCallback((options: ScanOptions) => {
+    if (scanRunningRef.current) return;
+
+    dispatch({ type: 'SET_SCAN_RUNNING', value: true });
+    dispatch({ type: 'SET_SCAN_RESULTS', results: null });
+    dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
+
+    const params = new URLSearchParams();
+    if (options.noCache) params.set('noCache', 'true');
+    if (options.checkChangelogs) params.set('checkChangelogs', 'true');
+    if (options.useLlm) params.set('useLlm', 'true');
+    if (options.limit > 0) params.set('limit', String(options.limit));
+
+    const es = new EventSource(`/api/scan/stream?${params}`);
+    esRef.current = es;
+
+    es.addEventListener('progress', (e) => {
+      const d = JSON.parse(e.data) as ScanProgress;
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: d });
+    });
+
+    es.addEventListener('status', (e) => {
+      const d = JSON.parse(e.data) as { message: string };
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current: 0, total: 0, modName: d.message, source: '' } });
+    });
+
+    es.addEventListener('done', (e) => {
+      es.close();
+      esRef.current = null;
+      const results = JSON.parse(e.data) as ScanResults;
+      dispatch({ type: 'SET_SCAN_RESULTS', results });
+      dispatch({ type: 'SET_SCAN_RUNNING', value: false });
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
+    });
+
+    es.addEventListener('error', () => {
+      es.close();
+      esRef.current = null;
+      dispatch({ type: 'SET_SCAN_RUNNING', value: false });
+    });
+  }, [dispatch]);
+
+  return { startScan, scanRunning: state.scanRunning };
+}

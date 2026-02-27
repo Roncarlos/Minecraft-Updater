@@ -5,9 +5,14 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
+    "dev": "concurrently \"node server.js\" \"cd client && npx vite\"",
+    "build": "cd client && npm run build",
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

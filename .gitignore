@@ -5,3 +5,5 @@ ModUpdateCache.json
 ModUpdateReport.html
 .claude/
 settings.json
+client/dist/
+client/node_modules/

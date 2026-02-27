@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 app.use(express.json());
-app.use(express.static(join(__dirname, 'public')));
+app.use(express.static(join(__dirname, 'client', 'dist')));
 
 // ── State ──────────────────────────────────────────────────────────────────
 let selectedInstancePath = null;
@@ -374,6 +374,11 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// SPA fallback — must come after all /api routes
+app.get('/{*path}', (req, res) => {
+  res.sendFile(join(__dirname, 'client', 'dist', 'index.html'));
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────
