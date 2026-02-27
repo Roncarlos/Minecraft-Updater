@@ -14,6 +14,7 @@ export function useScanStream() {
   const { state, dispatch } = useAppContext();
   const esRef = useRef<EventSource | null>(null);
   const scanRunningRef = useRef(false);
+  const lastProgressRef = useRef<{ current: number; total: number }>({ current: 0, total: 0 });
 
   // Keep ref in sync with state
   scanRunningRef.current = state.scanRunning;
@@ -32,6 +33,7 @@ export function useScanStream() {
     dispatch({ type: 'SET_SCAN_RUNNING', value: true });
     dispatch({ type: 'SET_SCAN_RESULTS', results: null });
     dispatch({ type: 'SET_SCAN_PROGRESS', progress: null });
+    lastProgressRef.current = { current: 0, total: 0 };
 
     const params = new URLSearchParams();
     if (options.noCache) params.set('noCache', 'true');
@@ -44,12 +46,14 @@ export function useScanStream() {
 
     es.addEventListener('progress', (e) => {
       const d = JSON.parse(e.data) as ScanProgress;
+      lastProgressRef.current = { current: d.current, total: d.total };
       dispatch({ type: 'SET_SCAN_PROGRESS', progress: d });
     });
 
     es.addEventListener('status', (e) => {
       const d = JSON.parse(e.data) as { message: string };
-      dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current: 0, total: 0, modName: d.message, source: '' } });
+      const { current, total } = lastProgressRef.current;
+      dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current, total, modName: d.message, source: '' } });
     });
 
     es.addEventListener('done', (e) => {
@@ -77,7 +81,8 @@ export function useScanStream() {
 
   const cancelScan = useCallback(async () => {
     // Show immediate feedback while waiting for server to finish current work
-    dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current: 0, total: 0, modName: 'Cancelling...', source: '' } });
+    const { current, total } = lastProgressRef.current;
+    dispatch({ type: 'SET_SCAN_PROGRESS', progress: { current, total, modName: 'Cancelling...', source: '' } });
     try {
       await cancelScanApi();
       // Server will send 'cancelled' SSE event → handled by the listener above
