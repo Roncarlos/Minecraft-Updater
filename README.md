@@ -32,7 +32,15 @@ npm install
 
 ### Running
 
+**Development** (hot-reload for both frontend and backend):
 ```bash
+npm run dev
+```
+This starts the Express backend on port 3000 and the Vite dev server on port 5173 (with API proxy).
+
+**Production**:
+```bash
+npm run build
 npm start
 ```
 
@@ -49,7 +57,7 @@ The app auto-detects CurseForge instances from the default path:
 
 1. Select your instance profile from the dropdown
 2. Check the options you want:
-   - **No Cache** — Force fresh API queries (ignores 24h cache)
+   - **No Cache** — Force fresh API queries (ignores the configured cache max age)
    - **Check Changelogs** — Fetch and analyze changelogs for breaking changes
    - **LLM Analysis** — Use AI to classify changelog severity (requires configuration, see below)
    - **Limit** — Scan only the first N mods (useful for testing)
@@ -122,9 +130,18 @@ LLM analysis is optional but significantly improves categorization accuracy. It 
 ### Setup via the UI
 
 1. Click the **gear icon** (⚙) in the controls bar
-2. Fill in the LLM settings:
+2. Fill in the settings:
 
 ![Settings modal with LLM configuration](docs/images/settings-llm.png)
+
+#### Cache Settings
+
+| Setting | Description |
+|---------|-------------|
+| **Cache Max Age** | How many hours before cached scan results are considered stale (1–720, default: 24) |
+| **Prune Days** | Delete cache entries older than this many days (1–90, default: 7) |
+
+#### LLM Settings
 
 | Setting | Description |
 |---------|-------------|
@@ -136,7 +153,7 @@ LLM analysis is optional but significantly improves categorization accuracy. It 
 | **Temperature** | Lower = more deterministic (default: 0.1) |
 | **Concurrency** | Number of parallel LLM requests (default: 2) |
 
-3. Click **Test Connection** to verify the endpoint is reachable
+3. Click **Test Connection** to verify the LLM endpoint is reachable
 4. Click **Detect** next to Concurrency to auto-detect how many model instances your server supports (works with LM Studio's `:N` instance suffixes)
 5. Click **Save**
 
@@ -148,6 +165,10 @@ You can also edit `settings.json` directly in the project root:
 
 ```json
 {
+  "cache": {
+    "maxAgeHours": 24,
+    "pruneDays": 7
+  },
   "llm": {
     "enabled": true,
     "endpoint": "http://localhost:1234/v1/chat/completions",
@@ -216,7 +237,7 @@ The classification logic uses multiple signals in priority order:
 ```
 minecraft-mod-updater/
 ├── server.js              # Express server & API routes
-├── settings.json          # User configuration (LLM settings)
+├── settings.json          # User configuration (cache & LLM settings)
 ├── package.json
 ├── lib/
 │   ├── config.js          # Constants, paths, keywords, regex
