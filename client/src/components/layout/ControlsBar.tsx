@@ -28,7 +28,7 @@ export default function ControlsBar() {
       <Checkbox label="LLM Analysis" checked={useLlm} onChange={setUseLlm} disabled={!state.llmConfigured} />
       <Button
         variant="settings"
-        size="sm"
+        size="md"
         className="ml-auto text-lg leading-none px-3 py-1.5"
         onClick={() => openModal({ type: 'settings' })}
       >
