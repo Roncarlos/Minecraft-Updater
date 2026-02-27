@@ -12,6 +12,7 @@ export default function SettingsModal() {
   const [testResult, setTestResult] = useState<{ text: string; color: string } | null>(null);
   const [detectResult, setDetectResult] = useState<{ text: string; color: string } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const llm = state.settings?.llm;
   const cache = state.settings?.cache;
@@ -36,11 +37,14 @@ export default function SettingsModal() {
 
   const handleSave = handleSubmit(async (data) => {
     setSaveError(null);
+    setSaving(true);
     try {
       await saveSettings(data);
       closeModal();
     } catch (err) {
       setSaveError('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setSaving(false);
     }
   });
 
@@ -167,8 +171,8 @@ export default function SettingsModal() {
       </div>
       {saveError && <p className="text-danger text-[0.85rem] mt-2">{saveError}</p>}
       <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-        <Button variant="cancel" size="sm" onClick={closeModal}>Cancel</Button>
-        <Button variant="confirm" size="sm" onClick={handleSave}>Save</Button>
+        <Button variant="cancel" size="sm" onClick={closeModal} disabled={saving}>Cancel</Button>
+        <Button variant="confirm" size="sm" onClick={handleSave} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
       </div>
     </ModalShell>
   );
