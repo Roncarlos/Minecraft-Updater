@@ -13,7 +13,8 @@ A web-based tool for managing Minecraft mod updates across CurseForge instances.
 - **LLM changelog analysis** — Optional AI-powered analysis that classifies changes as breaking, caution, or safe
 - **Keyword fallback** — When LLM is disabled, scans changelogs for breaking change keywords
 - **Download, apply & rollback** — Download updates, apply them with automatic backup, and rollback if something goes wrong
-- **Real-time progress** — SSE-based live scan progress in the browser
+- **Real-time progress** — SSE-based live scan progress in the browser, with cancel support to abort long scans mid-flight
+- **Open in editor** — Click any config/script reference to open the file at that line in VS Code (falls back to OS default)
 
 ## Quick Start
 
@@ -62,6 +63,7 @@ The app auto-detects CurseForge instances from the default path:
    - **LLM Analysis** — Use AI to classify changelog severity (requires configuration, see below)
    - **Limit** — Scan only the first N mods (useful for testing)
 3. Click **Scan for Updates**
+4. To abort a running scan, click **Cancel** — the UI returns to idle immediately and partial results are discarded
 
 ![Scan in progress](docs/images/scan-progress.png)
 
@@ -102,6 +104,8 @@ Click the refs count to see which files reference a mod, grouped by severity tie
 | **Low** | Muted | Resource packs |
 
 A mod's overall severity is its worst tier. This affects categorization — mods with high-severity refs and version bumps go to Breaking Changes, while mods with only low-severity refs go to Caution.
+
+Each file path is clickable — it opens the file in VS Code at the referenced line (requires `code` on PATH). If VS Code isn't available, the file opens in the OS default handler.
 
 ![References modal](docs/images/config-refs.png)
 
@@ -248,10 +252,15 @@ minecraft-mod-updater/
 │   ├── depgraph.js        # Dependency graph & topological sort
 │   ├── downloader.js      # Download, apply & rollback operations
 │   └── settings.js        # Settings file management
-├── public/
-│   ├── index.html         # Web UI
-│   ├── app.js             # Client-side logic & SSE handling
-│   └── style.css          # Dark theme styling
+├── client/                # React frontend (Vite + TypeScript + Tailwind 4)
+│   ├── src/
+│   │   ├── App.tsx        # Root component, modal state
+│   │   ├── context.ts     # AppContext with useReducer
+│   │   ├── api/           # Typed fetch wrappers & endpoint functions
+│   │   ├── hooks/         # useScanStream, useInstances, useModActions, etc.
+│   │   ├── utils/         # Dependency graph helpers, severity rules
+│   │   └── components/    # layout/, results/, modals/, ui/
+│   └── dist/              # Production build (served by Express)
 ├── docs/
 │   └── images/            # Screenshots for documentation
 ├── downloads/             # Staged mod downloads (auto-created)
@@ -277,13 +286,20 @@ minecraft-mod-updater/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/scan/stream` | Start scan with SSE progress (query params: `noCache`, `checkChangelogs`, `useLlm`, `limit`) |
+| POST | `/api/scan/cancel` | Abort a running scan |
 | GET | `/api/scan/results` | Get last completed scan results |
 
 ### References
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/config-refs/:addonId` | List files referencing a mod (with severity breakdown) |
+| GET | `/api/config-refs/:addonId` | List files referencing a mod (with line numbers and severity breakdown) |
+
+### File Operations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/open-file` | Open a file in VS Code or OS default handler (body: `filePath`, optional `line`) |
 
 ### Downloads & Updates
 
