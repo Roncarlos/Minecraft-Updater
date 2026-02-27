@@ -251,7 +251,9 @@ minecraft-mod-updater/
 │   ├── llm.js             # LLM changelog analysis with concurrency
 │   ├── depgraph.js        # Dependency graph & topological sort
 │   ├── downloader.js      # Download, apply & rollback operations
-│   └── settings.js        # Settings file management
+│   ├── settings.js        # Settings file management
+│   ├── report.js          # LLM-readable scan report builder
+│   └── html-to-text.js    # HTML-to-plain-text converter for changelogs
 ├── client/                # React frontend (Vite + TypeScript + Tailwind 4)
 │   ├── src/
 │   │   ├── App.tsx        # Root component, modal state
@@ -261,6 +263,8 @@ minecraft-mod-updater/
 │   │   ├── utils/         # Dependency graph helpers, severity rules
 │   │   └── components/    # layout/, results/, modals/, ui/
 │   └── dist/              # Production build (served by Express)
+├── commands/
+│   └── modpack-report.md  # /modpack-report slash command for Claude Code
 ├── docs/
 │   └── images/            # Screenshots for documentation
 ├── downloads/             # Staged mod downloads (auto-created)
@@ -288,6 +292,7 @@ minecraft-mod-updater/
 | GET | `/api/scan/stream` | Start scan with SSE progress (query params: `noCache`, `checkChangelogs`, `useLlm`, `limit`) |
 | POST | `/api/scan/cancel` | Abort a running scan |
 | GET | `/api/scan/results` | Get last completed scan results |
+| GET | `/api/report` | Get an LLM-readable report of the last scan (token-efficient JSON) |
 
 ### References
 
@@ -323,6 +328,50 @@ minecraft-mod-updater/
 | GET | `/api/settings/detect-concurrency` | Detect available model instances |
 
 </details>
+
+## Claude Code Integration
+
+You can ask [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to analyze your scan results and recommend an update strategy using the included slash command.
+
+### Setup
+
+1. Install Claude Code if you haven't already
+2. Copy the included command into your project's `.claude/commands/` directory:
+   ```bash
+   mkdir -p .claude/commands
+   cp commands/modpack-report.md .claude/commands/
+   ```
+   (`.claude/` is gitignored, so this is a local-only setup step)
+3. Make sure the mod updater is running (`npm run dev` or `npm start`) and you've completed a scan
+4. Open Claude Code in the project directory
+
+### Usage
+
+Run the slash command:
+
+```
+/modpack-report
+```
+
+Claude will fetch the scan report from `GET /api/report`, analyze every flagged mod, and produce a concrete update plan: what to skip, what needs config adjustments, and what's safe to bulk-update.
+
+You can also fetch the report manually for use with any LLM:
+
+```bash
+curl -s http://localhost:3000/api/report | jq .
+```
+
+### What the report includes
+
+The `/api/report` endpoint returns a single JSON object designed for token efficiency:
+
+- **Instance metadata** — name, MC version, loader, mod counts
+- **Summary counts** — per-category totals at a glance
+- **Categorized mods** — breaking, caution, reviewDeps, safeToUpdate, and updatesAvailable (up-to-date mods are excluded — just counted)
+- **Plain-text changelogs** — HTML stripped, entities decoded, LLM analysis inlined
+- **Config references** — file paths with line numbers and severity tiers
+- **Resolved dependencies** — addon IDs mapped to names and categories
+- **Missing deps & errors** — with context on which mods need them
 
 ## License
 
