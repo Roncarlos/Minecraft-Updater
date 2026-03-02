@@ -4,6 +4,9 @@ import ModSearch from './ModSearch';
 import PresetModList from './PresetModList';
 import ConfigManager from './ConfigManager';
 import ConfigTree from './ConfigTree';
+import KubejsManager from './KubejsManager';
+import KubejsTree from './KubejsTree';
+import ResourcepackManager from './ResourcepackManager';
 import ApplyPanel from './ApplyPanel';
 import type { Preset, Instance, ModalState } from '../../types';
 
@@ -109,6 +112,23 @@ export default function PresetEditor({ preset, instances, onUpdate, onRefresh, o
             </h3>
             <ConfigManager presetId={preset.id} onRefresh={onRefresh} />
             <ConfigTree presetId={preset.id} configs={preset.configs} onRefresh={onRefresh} openModal={openModal} />
+          </div>
+
+          {/* KubeJS Section */}
+          <div>
+            <h3 className="text-info text-[0.9rem] uppercase tracking-wide mb-3 pb-1.5 border-b border-border">
+              KubeJS ({preset.kubejs.length})
+            </h3>
+            <KubejsManager presetId={preset.id} onRefresh={onRefresh} />
+            <KubejsTree presetId={preset.id} kubejs={preset.kubejs} onRefresh={onRefresh} openModal={openModal} />
+          </div>
+
+          {/* Resource Packs Section */}
+          <div>
+            <h3 className="text-info text-[0.9rem] uppercase tracking-wide mb-3 pb-1.5 border-b border-border">
+              Resource Packs ({preset.resourcepacks.length})
+            </h3>
+            <ResourcepackManager presetId={preset.id} resourcepacks={preset.resourcepacks} onRefresh={onRefresh} />
           </div>
 
           {/* Apply Section */}

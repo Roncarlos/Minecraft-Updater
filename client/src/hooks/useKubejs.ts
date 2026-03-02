@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import * as api from '../api/modifier-endpoints';
 
-export function useConfigs(presetId: string) {
+export function useKubejs(presetId: string) {
   const [importing, setImporting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -10,7 +10,7 @@ export function useConfigs(presetId: string) {
     setImporting(true);
     setError(null);
     try {
-      await api.importConfigs(presetId, folderPath);
+      await api.importKubejs(presetId, folderPath);
       await onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -23,7 +23,7 @@ export function useConfigs(presetId: string) {
     setImporting(true);
     setError(null);
     try {
-      await api.importSingleConfig(presetId, filePath);
+      await api.importSingleKubejs(presetId, filePath);
       await onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
@@ -32,11 +32,11 @@ export function useConfigs(presetId: string) {
     }
   }, [presetId]);
 
-  const upload = useCallback(async (targetPath: string, content: string, onDone: () => Promise<void>) => {
+  const upload = useCallback(async (targetPath: string, content: string, binary: boolean, onDone: () => Promise<void>) => {
     setUploading(true);
     setError(null);
     try {
-      await api.uploadConfig(presetId, targetPath, content);
+      await api.uploadKubejs(presetId, targetPath, content, binary);
       await onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
@@ -48,7 +48,7 @@ export function useConfigs(presetId: string) {
   const deleteFile = useCallback(async (targetPath: string, onDone: () => Promise<void>) => {
     setError(null);
     try {
-      await api.deleteConfigFile(presetId, targetPath);
+      await api.deleteKubejsFile(presetId, targetPath);
       await onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Delete failed');
@@ -56,19 +56,9 @@ export function useConfigs(presetId: string) {
   }, [presetId]);
 
   const readFile = useCallback(async (targetPath: string) => {
-    const data = await api.fetchConfigContent(presetId, targetPath);
+    const data = await api.fetchKubejsContent(presetId, targetPath);
     return data.content;
   }, [presetId]);
 
-  const saveFile = useCallback(async (targetPath: string, content: string, onDone: () => Promise<void>) => {
-    setError(null);
-    try {
-      await api.saveConfigContent(presetId, targetPath, content);
-      await onDone();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed');
-    }
-  }, [presetId]);
-
-  return { importing, uploading, error, importFromFolder, importFile, upload, deleteFile, readFile, saveFile };
+  return { importing, uploading, error, importFromFolder, importFile, upload, deleteFile, readFile };
 }

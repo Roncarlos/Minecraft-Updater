@@ -52,6 +52,8 @@ export default function PresetSidebar({ presets, selectedId, onSelect, onCreate,
                 <div className="text-[0.85rem] font-medium truncate">{p.name}</div>
                 <div className="text-[0.75rem] text-muted">
                   {p.modCount} mods &middot; {p.configCount} configs
+                  {p.kubejsCount > 0 && <> &middot; {p.kubejsCount} kubejs</>}
+                  {p.resourcepackCount > 0 && <> &middot; {p.resourcepackCount} packs</>}
                 </div>
               </div>
               <button

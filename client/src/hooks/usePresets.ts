@@ -51,6 +51,8 @@ export function usePresets() {
       loader: preset.loader,
       modCount: 0,
       configCount: 0,
+      kubejsCount: 0,
+      resourcepackCount: 0,
       createdAt: preset.createdAt,
     }]);
     setSelectedId(preset.id);
@@ -68,6 +70,8 @@ export function usePresets() {
       loader: updated.loader,
       modCount: updated.mods.length,
       configCount: updated.configs.length,
+      kubejsCount: updated.kubejs.length,
+      resourcepackCount: updated.resourcepacks.length,
     } : p));
   }, [selectedId]);
 
@@ -89,6 +93,8 @@ export function usePresets() {
         ...p,
         modCount: preset.mods.length,
         configCount: preset.configs.length,
+        kubejsCount: preset.kubejs.length,
+        resourcepackCount: preset.resourcepacks.length,
       } : p));
     } catch (err) { console.warn('Failed to refresh preset:', err); }
   }, [selectedId]);

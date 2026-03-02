@@ -162,6 +162,8 @@ export interface PresetSummary {
   loader: string;
   modCount: number;
   configCount: number;
+  kubejsCount: number;
+  resourcepackCount: number;
   createdAt: string;
 }
 
@@ -177,6 +179,7 @@ export interface PresetMod {
 export interface PresetConfigEntry {
   targetPath: string;
   sizeBytes: number;
+  isText?: boolean;
 }
 
 export interface Preset {
@@ -188,6 +191,8 @@ export interface Preset {
   createdAt: string;
   mods: PresetMod[];
   configs: PresetConfigEntry[];
+  kubejs: PresetConfigEntry[];
+  resourcepacks: PresetConfigEntry[];
 }
 
 export interface CfSearchResult {
@@ -226,11 +231,19 @@ export interface ApplyConfigResult {
   error?: string;
 }
 
+export interface ApplyCategoryResult {
+  targetPath: string;
+  success: boolean;
+  error?: string;
+}
+
 export interface ApplyPresetResult {
   presetName: string;
   instanceName: string;
   mods: ApplyModResult[];
   configs: ApplyConfigResult[];
+  kubejs: ApplyCategoryResult[];
+  resourcepacks: ApplyCategoryResult[];
   errors: string[];
 }
 

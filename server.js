@@ -1,20 +1,60 @@
-import express from 'express';
-import { join, dirname, resolve, relative, isAbsolute } from 'path';
-import { fileURLToPath } from 'url';
-import { access } from 'fs/promises';
-import { execFile } from 'child_process';
-import { PORT, INSTANCES_ROOT, CACHE_VERSION } from './lib/config.js';
-import { listInstances, loadInstance, scanConfigRefs, runScan, pruneCache } from './lib/scanner.js';
-import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
-import { loadSettings, saveSettings } from './lib/settings.js';
-import { buildReport } from './lib/report.js';
+import express from "express";
+import { join, dirname, resolve, relative, isAbsolute } from "path";
+import { fileURLToPath } from "url";
+import { access } from "fs/promises";
+import { execFile } from "child_process";
+import { PORT, INSTANCES_ROOT, CACHE_VERSION } from "./lib/config.js";
 import {
-  listPresets, createPreset, getPreset, updatePreset, deletePreset,
-  addModToPreset, removeModFromPreset,
-  listConfigs, importConfigsFromFolder, uploadConfig, readConfig, resolveConfigPath, saveConfig, deleteConfig,
-  downloadPresetMods, applyPreset as applyPresetToInstance,
-} from './lib/modifier.js';
-import { searchMods, getModFiles, LOADER_MAP } from './lib/curseforge.js';
+  listInstances,
+  loadInstance,
+  scanConfigRefs,
+  runScan,
+  pruneCache,
+} from "./lib/scanner.js";
+import {
+  downloadMod,
+  applyMod,
+  downloadBulk,
+  applyBulk,
+  rollbackMod,
+  rollbackBulk,
+  getDownloadState,
+} from "./lib/downloader.js";
+import { loadSettings, saveSettings } from "./lib/settings.js";
+import { buildReport } from "./lib/report.js";
+import {
+  listPresets,
+  createPreset,
+  getPreset,
+  updatePreset,
+  deletePreset,
+  addModToPreset,
+  removeModFromPreset,
+  listConfigs,
+  importConfigsFromFolder,
+  importSingleConfigFile,
+  uploadConfig,
+  readConfig,
+  resolveConfigPath,
+  saveConfig,
+  deleteConfig,
+  listKubejs,
+  importKubejsFromFolder,
+  importSingleKubejsFile,
+  uploadKubejs,
+  readKubejs,
+  saveKubejs,
+  deleteKubejs,
+  resolveKubejsPath,
+  listResourcepacks,
+  importResourcepacksFromFolder,
+  uploadResourcepack,
+  deleteResourcepack,
+  resolveResourcepackPath,
+  downloadPresetMods,
+  applyPreset as applyPresetToInstance,
+} from "./lib/modifier.js";
+import { searchMods, getModFiles, LOADER_MAP } from "./lib/curseforge.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -23,11 +63,11 @@ const app = express();
 const wrapAsync = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
-const isDev = process.argv.includes('--dev');
+const isDev = process.argv.includes("--dev");
 
 app.use(express.json());
 if (!isDev) {
-  app.use(express.static(join(__dirname, 'client', 'dist')));
+  app.use(express.static(join(__dirname, "client", "dist")));
 }
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -40,7 +80,7 @@ let lastConfigRefs = {};
 let lastRefSeverity = {};
 
 // ── GET /api/instances ─────────────────────────────────────────────────────
-app.get('/api/instances', async (req, res) => {
+app.get("/api/instances", async (req, res) => {
   try {
     const instances = await listInstances();
     const selectedName = selectedInstancePath.split(/[\\/]/).pop();
@@ -51,14 +91,16 @@ app.get('/api/instances', async (req, res) => {
 });
 
 // ── POST /api/instance/select ──────────────────────────────────────────────
-app.post('/api/instance/select', async (req, res) => {
+app.post("/api/instance/select", async (req, res) => {
   const { name } = req.body;
   if (!name) {
-    res.status(400).json({ error: 'Missing instance name' });
+    res.status(400).json({ error: "Missing instance name" });
     return;
   }
   if (scanRunning) {
-    res.status(409).json({ error: 'Cannot switch profile while a scan is running' });
+    res
+      .status(409)
+      .json({ error: "Cannot switch profile while a scan is running" });
     return;
   }
 
@@ -71,26 +113,37 @@ app.post('/api/instance/select', async (req, res) => {
     lastScanVersion = null;
     lastConfigRefs = {};
     lastRefSeverity = {};
-    res.json({ instanceName: data.instanceName, mcVersion: data.mcVersion, loaderName: data.loaderName, modCount: data.allAddons.length });
+    res.json({
+      instanceName: data.instanceName,
+      mcVersion: data.mcVersion,
+      loaderName: data.loaderName,
+      modCount: data.allAddons.length,
+    });
   } catch (err) {
     res.status(400).json({ error: `Failed to load instance: ${err.message}` });
   }
 });
 
 // ── GET /api/instance ──────────────────────────────────────────────────────
-app.get('/api/instance', async (req, res) => {
+app.get("/api/instance", async (req, res) => {
   try {
-    const { mcVersion, loaderName, instanceName, allAddons } = await loadInstance(selectedInstancePath);
-    res.json({ instanceName, mcVersion, loaderName, modCount: allAddons.length });
+    const { mcVersion, loaderName, instanceName, allAddons } =
+      await loadInstance(selectedInstancePath);
+    res.json({
+      instanceName,
+      mcVersion,
+      loaderName,
+      modCount: allAddons.length,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // ── GET /api/scan/stream (SSE) ─────────────────────────────────────────────
-app.get('/api/scan/stream', async (req, res) => {
+app.get("/api/scan/stream", async (req, res) => {
   if (scanRunning) {
-    res.status(409).json({ error: 'Scan already in progress' });
+    res.status(409).json({ error: "Scan already in progress" });
     return;
   }
   scanRunning = true;
@@ -98,14 +151,14 @@ app.get('/api/scan/stream', async (req, res) => {
   const { signal } = scanAbortController;
 
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive',
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
   });
 
   // Track client disconnect to avoid writing to a dead connection
   let clientDisconnected = false;
-  req.on('close', () => {
+  req.on("close", () => {
     clientDisconnected = true;
     if (scanAbortController) scanAbortController.abort();
   });
@@ -115,10 +168,10 @@ app.get('/api/scan/stream', async (req, res) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
 
-  const noCache = req.query.noCache === 'true';
+  const noCache = req.query.noCache === "true";
   const limit = parseInt(req.query.limit) || 0;
-  const checkChangelogs = req.query.checkChangelogs === 'true';
-  const useLlm = req.query.useLlm === 'true';
+  const checkChangelogs = req.query.checkChangelogs === "true";
+  const useLlm = req.query.useLlm === "true";
 
   let scanOptions = { noCache, limit, checkChangelogs, signal };
 
@@ -129,23 +182,28 @@ app.get('/api/scan/stream', async (req, res) => {
         scanOptions.useLlm = true;
         scanOptions.settings = settings;
       }
-    } catch { /* fall back to keyword mode */ }
+    } catch {
+      /* fall back to keyword mode */
+    }
   }
 
   try {
     const { allAddons } = await loadInstance(selectedInstancePath);
-    const { refFiles, refSeverity } = await scanConfigRefs(selectedInstancePath, allAddons);
+    const { refFiles, refSeverity } = await scanConfigRefs(
+      selectedInstancePath,
+      allAddons,
+    );
     lastConfigRefs = refFiles;
     lastRefSeverity = refSeverity;
     lastScanVersion = CACHE_VERSION;
 
     let scanResults = null;
     await runScan(selectedInstancePath, scanOptions, (event) => {
-      if (event.type === 'progress') {
-        send('progress', event);
-      } else if (event.type === 'status') {
-        send('status', event);
-      } else if (event.type === 'done') {
+      if (event.type === "progress") {
+        send("progress", event);
+      } else if (event.type === "status") {
+        send("status", event);
+      } else if (event.type === "done") {
         scanResults = event.results;
       }
     });
@@ -153,15 +211,15 @@ app.get('/api/scan/stream', async (req, res) => {
     if (scanResults) lastScanResults = scanResults;
 
     if (signal.aborted) {
-      send('cancelled', { reason: 'Scan cancelled' });
+      send("cancelled", { reason: "Scan cancelled" });
     } else {
-      send('done', scanResults);
+      send("done", scanResults);
     }
   } catch (err) {
     if (signal.aborted) {
-      send('cancelled', { reason: 'Scan cancelled' });
+      send("cancelled", { reason: "Scan cancelled" });
     } else {
-      send('error', { error: err.message });
+      send("error", { error: err.message });
     }
   } finally {
     scanRunning = false;
@@ -171,9 +229,9 @@ app.get('/api/scan/stream', async (req, res) => {
 });
 
 // ── POST /api/scan/cancel ─────────────────────────────────────────────────
-app.post('/api/scan/cancel', (req, res) => {
+app.post("/api/scan/cancel", (req, res) => {
   if (!scanRunning || !scanAbortController) {
-    res.status(409).json({ error: 'No scan in progress' });
+    res.status(409).json({ error: "No scan in progress" });
     return;
   }
   scanAbortController.abort();
@@ -181,16 +239,18 @@ app.post('/api/scan/cancel', (req, res) => {
 });
 
 // ── GET /api/scan/results ──────────────────────────────────────────────────
-app.get('/api/scan/results', (req, res) => {
+app.get("/api/scan/results", (req, res) => {
   if (!lastScanResults || lastScanVersion !== CACHE_VERSION) {
-    res.status(404).json({ error: 'No scan results available. Run a scan first.' });
+    res
+      .status(404)
+      .json({ error: "No scan results available. Run a scan first." });
     return;
   }
   res.json(lastScanResults);
 });
 
 // ── GET /api/config-refs/:addonId ──────────────────────────────────────────
-app.get('/api/config-refs/:addonId', (req, res) => {
+app.get("/api/config-refs/:addonId", (req, res) => {
   if (lastScanVersion !== CACHE_VERSION) {
     res.json({ addonId: req.params.addonId, files: {}, severity: null });
     return;
@@ -207,61 +267,49 @@ let vsCodeCheckedAt = 0;
 const VSCODE_CHECK_TTL = 5 * 60 * 1000; // 5 minutes
 
 function checkVSCode() {
-  if (vsCodePromise && Date.now() - vsCodeCheckedAt < VSCODE_CHECK_TTL) return vsCodePromise;
+  if (vsCodePromise && Date.now() - vsCodeCheckedAt < VSCODE_CHECK_TTL)
+    return vsCodePromise;
   vsCodeCheckedAt = Date.now();
-  const cmd = process.platform === 'win32' ? 'where' : 'which';
+  const cmd = process.platform === "win32" ? "where" : "which";
   vsCodePromise = new Promise((resolve) => {
-    execFile(cmd, ['code'], (err) => resolve(!err));
+    execFile(cmd, ["code"], (err) => resolve(!err));
   });
   return vsCodePromise;
 }
 
-// ── POST /api/open-file ─────────────────────────────────────────────────────
-app.post('/api/open-file', async (req, res) => {
-  const { filePath, line } = req.body;
-  if (typeof filePath !== 'string' || !filePath || !selectedInstancePath) {
-    res.status(400).json({ error: 'Missing filePath or no instance selected' });
-    return;
-  }
+// ── Shared: open file externally ─────────────────────────────────────────────
 
-  const absPath = resolve(selectedInstancePath, filePath);
-  // Validate the resolved path stays within the instance directory
-  const rel = relative(selectedInstancePath, absPath);
-  if (rel.startsWith('..') || isAbsolute(rel)) {
-    res.status(400).json({ error: 'Path escapes instance directory' });
-    return;
-  }
-
+async function openFileExternally(absPath, res, line = 1) {
   try {
     await access(absPath);
   } catch {
-    res.status(404).json({ error: 'File not found' });
+    res.status(404).json({ error: "File not found" });
     return;
   }
 
   const hasVSCode = await checkVSCode();
   let bin, args;
+  const lineNum = typeof line === "number" && line > 0 ? line : 1;
 
   if (hasVSCode) {
-    const lineNum = typeof line === 'number' && line > 0 ? line : 1;
-    bin = 'code';
-    args = ['--goto', `"${absPath}:${lineNum}"`];
+    bin = "code";
+    args = ["--goto", `"${absPath}:${lineNum}"`];
   } else {
     const platform = process.platform;
-    if (platform === 'win32') {
-      bin = 'cmd';
-      args = ['/c', 'start', '""', absPath];
-    } else if (platform === 'darwin') {
-      bin = 'open';
+    if (platform === "win32") {
+      bin = "cmd";
+      args = ["/c", "start", '""', absPath];
+    } else if (platform === "darwin") {
+      bin = "open";
       args = [absPath];
     } else {
-      bin = 'xdg-open';
+      bin = "xdg-open";
       args = [absPath];
     }
   }
 
-  // code is a .cmd on Windows, so it needs shell: true to resolve
-  const opts = hasVSCode && process.platform === 'win32' ? { shell: true } : {};
+  const opts =
+    hasVSCode && process.platform === "win32" ? { shell: true } : {};
   execFile(bin, args, opts, (err) => {
     if (err) {
       res.status(500).json({ error: `Failed to open file: ${err.message}` });
@@ -269,13 +317,34 @@ app.post('/api/open-file', async (req, res) => {
     }
     res.json({ success: true });
   });
+}
+
+// ── POST /api/open-file ─────────────────────────────────────────────────────
+app.post("/api/open-file", async (req, res) => {
+  const { filePath, line } = req.body;
+  if (typeof filePath !== "string" || !filePath || !selectedInstancePath) {
+    res.status(400).json({ error: "Missing filePath or no instance selected" });
+    return;
+  }
+
+  const absPath = resolve(selectedInstancePath, filePath);
+  // Validate the resolved path stays within the instance directory
+  const rel = relative(selectedInstancePath, absPath);
+  if (rel.startsWith("..") || isAbsolute(rel)) {
+    res.status(400).json({ error: "Path escapes instance directory" });
+    return;
+  }
+
+  await openFileExternally(absPath, res, line);
 });
 
 // ── POST /api/download ─────────────────────────────────────────────────────
-app.post('/api/download', async (req, res) => {
+app.post("/api/download", async (req, res) => {
   const { addonId, downloadUrl, fileName } = req.body;
   if (!addonId || !downloadUrl || !fileName) {
-    res.status(400).json({ error: 'Missing addonId, downloadUrl, or fileName' });
+    res
+      .status(400)
+      .json({ error: "Missing addonId, downloadUrl, or fileName" });
     return;
   }
   try {
@@ -287,10 +356,10 @@ app.post('/api/download', async (req, res) => {
 });
 
 // ── POST /api/download/bulk ────────────────────────────────────────────────
-app.post('/api/download/bulk', async (req, res) => {
+app.post("/api/download/bulk", async (req, res) => {
   const { mods } = req.body;
   if (!mods || !Array.isArray(mods)) {
-    res.status(400).json({ error: 'Missing mods array' });
+    res.status(400).json({ error: "Missing mods array" });
     return;
   }
   try {
@@ -302,14 +371,21 @@ app.post('/api/download/bulk', async (req, res) => {
 });
 
 // ── POST /api/apply ────────────────────────────────────────────────────────
-app.post('/api/apply', async (req, res) => {
+app.post("/api/apply", async (req, res) => {
   const { addonId, oldFileName, newFileName } = req.body;
   if (!addonId || !oldFileName || !newFileName) {
-    res.status(400).json({ error: 'Missing addonId, oldFileName, or newFileName' });
+    res
+      .status(400)
+      .json({ error: "Missing addonId, oldFileName, or newFileName" });
     return;
   }
   try {
-    const result = await applyMod(addonId, oldFileName, newFileName, selectedInstancePath);
+    const result = await applyMod(
+      addonId,
+      oldFileName,
+      newFileName,
+      selectedInstancePath,
+    );
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -317,10 +393,10 @@ app.post('/api/apply', async (req, res) => {
 });
 
 // ── POST /api/apply/bulk ───────────────────────────────────────────────────
-app.post('/api/apply/bulk', async (req, res) => {
+app.post("/api/apply/bulk", async (req, res) => {
   const { mods } = req.body;
   if (!mods || !Array.isArray(mods)) {
-    res.status(400).json({ error: 'Missing mods array' });
+    res.status(400).json({ error: "Missing mods array" });
     return;
   }
   try {
@@ -332,14 +408,21 @@ app.post('/api/apply/bulk', async (req, res) => {
 });
 
 // ── POST /api/rollback ─────────────────────────────────────────────────────
-app.post('/api/rollback', async (req, res) => {
+app.post("/api/rollback", async (req, res) => {
   const { addonId, oldFileName, newFileName } = req.body;
   if (!addonId || !oldFileName || !newFileName) {
-    res.status(400).json({ error: 'Missing addonId, oldFileName, or newFileName' });
+    res
+      .status(400)
+      .json({ error: "Missing addonId, oldFileName, or newFileName" });
     return;
   }
   try {
-    const result = await rollbackMod(addonId, oldFileName, newFileName, selectedInstancePath);
+    const result = await rollbackMod(
+      addonId,
+      oldFileName,
+      newFileName,
+      selectedInstancePath,
+    );
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -347,10 +430,10 @@ app.post('/api/rollback', async (req, res) => {
 });
 
 // ── POST /api/rollback/bulk ────────────────────────────────────────────────
-app.post('/api/rollback/bulk', async (req, res) => {
+app.post("/api/rollback/bulk", async (req, res) => {
   const { mods } = req.body;
   if (!mods || !Array.isArray(mods)) {
-    res.status(400).json({ error: 'Missing mods array' });
+    res.status(400).json({ error: "Missing mods array" });
     return;
   }
   try {
@@ -362,18 +445,18 @@ app.post('/api/rollback/bulk', async (req, res) => {
 });
 
 // ── GET /api/download-state ────────────────────────────────────────────────
-app.get('/api/download-state', (req, res) => {
+app.get("/api/download-state", (req, res) => {
   res.json(getDownloadState());
 });
 
 // ── GET /api/settings ───────────────────────────────────────────────────────
-app.get('/api/settings', async (req, res) => {
+app.get("/api/settings", async (req, res) => {
   try {
     const settings = await loadSettings();
     // Mask API key for client
     const masked = { ...settings, llm: { ...settings.llm } };
     if (masked.llm.apiKey) {
-      masked.llm.apiKey = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      masked.llm.apiKey = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
     }
     res.json(masked);
   } catch (err) {
@@ -382,11 +465,14 @@ app.get('/api/settings', async (req, res) => {
 });
 
 // ── POST /api/settings ─────────────────────────────────────────────────────
-app.post('/api/settings', async (req, res) => {
+app.post("/api/settings", async (req, res) => {
   try {
     const incoming = req.body;
     // Preserve existing API key when masked placeholder received
-    if (incoming.llm && incoming.llm.apiKey === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022') {
+    if (
+      incoming.llm &&
+      incoming.llm.apiKey === "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+    ) {
       const current = await loadSettings();
       incoming.llm.apiKey = current.llm.apiKey;
     }
@@ -394,7 +480,7 @@ app.post('/api/settings', async (req, res) => {
     // Return masked version
     const masked = { ...saved, llm: { ...saved.llm } };
     if (masked.llm.apiKey) {
-      masked.llm.apiKey = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+      masked.llm.apiKey = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
     }
     res.json(masked);
   } catch (err) {
@@ -403,28 +489,34 @@ app.post('/api/settings', async (req, res) => {
 });
 
 // ── GET /api/settings/models ───────────────────────────────────────────────
-app.get('/api/settings/models', async (req, res) => {
+app.get("/api/settings/models", async (req, res) => {
   try {
     const settings = await loadSettings();
     const { endpoint, apiKey } = settings.llm;
     if (!endpoint) {
-      res.json({ success: false, error: 'LLM endpoint not configured' });
+      res.json({ success: false, error: "LLM endpoint not configured" });
       return;
     }
 
-    const base = endpoint.replace(/\/+$/, '');
+    const base = endpoint.replace(/\/+$/, "");
     const headers = {};
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
+      const resp = await fetch(`${base}/models`, {
+        headers,
+        signal: controller.signal,
+      });
 
       if (!resp.ok) {
-        const errText = await resp.text().catch(() => '');
-        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        const errText = await resp.text().catch(() => "");
+        res.json({
+          success: false,
+          error: `HTTP ${resp.status}: ${errText.slice(0, 200)}`,
+        });
         return;
       }
 
@@ -435,7 +527,7 @@ app.get('/api/settings/models', async (req, res) => {
       const seen = new Set();
       const models = [];
       for (const m of allModels) {
-        const id = (m.id || '').replace(/:\d+$/, '');
+        const id = (m.id || "").replace(/:\d+$/, "");
         if (id && !seen.has(id)) {
           seen.add(id);
           models.push(id);
@@ -454,29 +546,31 @@ app.get('/api/settings/models', async (req, res) => {
 });
 
 // ── POST /api/settings/test-llm ────────────────────────────────────────────
-app.post('/api/settings/test-llm', async (req, res) => {
+app.post("/api/settings/test-llm", async (req, res) => {
   try {
     const settings = await loadSettings();
     const { endpoint, apiKey, model } = settings.llm;
     if (!endpoint || !model) {
-      res.status(400).json({ error: 'LLM endpoint and model must be configured' });
+      res
+        .status(400)
+        .json({ error: "LLM endpoint and model must be configured" });
       return;
     }
 
-    const headers = { 'Content-Type': 'application/json' };
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    const headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const base = endpoint.replace(/\/+$/, '');
+    const base = endpoint.replace(/\/+$/, "");
     try {
       const resp = await fetch(`${base}/chat/completions`, {
-        method: 'POST',
+        method: "POST",
         headers,
         body: JSON.stringify({
           model,
-          messages: [{ role: 'user', content: 'Respond with the word "ok".' }],
+          messages: [{ role: "user", content: 'Respond with the word "ok".' }],
           max_tokens: 16,
           temperature: 0,
         }),
@@ -485,13 +579,16 @@ app.post('/api/settings/test-llm', async (req, res) => {
       clearTimeout(timeout);
 
       if (!resp.ok) {
-        const errText = await resp.text().catch(() => '');
-        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        const errText = await resp.text().catch(() => "");
+        res.json({
+          success: false,
+          error: `HTTP ${resp.status}: ${errText.slice(0, 200)}`,
+        });
         return;
       }
 
       const data = await resp.json();
-      const content = data.choices?.[0]?.message?.content || '';
+      const content = data.choices?.[0]?.message?.content || "";
       res.json({ success: true, response: content.slice(0, 100) });
     } catch (fetchErr) {
       clearTimeout(timeout);
@@ -503,59 +600,75 @@ app.post('/api/settings/test-llm', async (req, res) => {
 });
 
 // ── GET /api/llm/health ──────────────────────────────────────────────────
-app.get('/api/llm/health', async (req, res) => {
+app.get("/api/llm/health", async (req, res) => {
   try {
     const settings = await loadSettings();
     const { enabled, endpoint, apiKey, model } = settings.llm;
     if (!enabled || !endpoint || !model) {
-      res.json({ status: 'unconfigured' });
+      res.json({ status: "unconfigured" });
       return;
     }
 
-    const base = endpoint.replace(/\/+$/, '');
+    const base = endpoint.replace(/\/+$/, "");
     const headers = {};
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
+      const resp = await fetch(`${base}/models`, {
+        headers,
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
-      res.json(resp.ok ? { status: 'online', model } : { status: 'offline', error: `HTTP ${resp.status}` });
+      res.json(
+        resp.ok
+          ? { status: "online", model }
+          : { status: "offline", error: `HTTP ${resp.status}` },
+      );
     } catch {
       clearTimeout(timeout);
-      res.json({ status: 'offline', error: 'Server unreachable' });
+      res.json({ status: "offline", error: "Server unreachable" });
     }
   } catch (err) {
-    res.json({ status: 'offline', error: err.message });
+    res.json({ status: "offline", error: err.message });
   }
 });
 
 // ── GET /api/settings/detect-concurrency ─────────────────────────────────
-app.get('/api/settings/detect-concurrency', async (req, res) => {
+app.get("/api/settings/detect-concurrency", async (req, res) => {
   try {
     const settings = await loadSettings();
     const { endpoint, apiKey, model } = settings.llm;
     if (!endpoint || !model) {
-      res.json({ success: false, error: 'LLM endpoint and model must be configured' });
+      res.json({
+        success: false,
+        error: "LLM endpoint and model must be configured",
+      });
       return;
     }
 
-    const base = endpoint.replace(/\/+$/, '');
+    const base = endpoint.replace(/\/+$/, "");
     const headers = {};
-    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
+      const resp = await fetch(`${base}/models`, {
+        headers,
+        signal: controller.signal,
+      });
       clearTimeout(timeout);
 
       if (!resp.ok) {
-        const errText = await resp.text().catch(() => '');
-        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        const errText = await resp.text().catch(() => "");
+        res.json({
+          success: false,
+          error: `HTTP ${resp.status}: ${errText.slice(0, 200)}`,
+        });
         return;
       }
 
@@ -563,15 +676,19 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
       const allModels = body.data || [];
 
       // Strip any :N suffix from the configured model name to get the base name
-      const baseName = model.replace(/:\d+$/, '');
+      const baseName = model.replace(/:\d+$/, "");
 
       // Count models whose id, after stripping :N, matches the base name
-      const matching = allModels.filter(m => {
-        const id = (m.id || '').replace(/:\d+$/, '');
+      const matching = allModels.filter((m) => {
+        const id = (m.id || "").replace(/:\d+$/, "");
         return id === baseName;
       });
 
-      res.json({ success: true, instances: matching.length, models: matching.map(m => m.id) });
+      res.json({
+        success: true,
+        instances: matching.length,
+        models: matching.map((m) => m.id),
+      });
     } catch (fetchErr) {
       clearTimeout(timeout);
       res.json({ success: false, error: fetchErr.message });
@@ -582,9 +699,11 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
 });
 
 // ── GET /api/report ──────────────────────────────────────────────────────
-app.get('/api/report', (req, res) => {
+app.get("/api/report", (req, res) => {
   if (!lastScanResults || lastScanVersion !== CACHE_VERSION) {
-    res.status(404).json({ error: 'No scan results available. Run a scan first.' });
+    res
+      .status(404)
+      .json({ error: "No scan results available. Run a scan first." });
     return;
   }
   res.json(buildReport(lastScanResults, lastConfigRefs, lastRefSeverity));
@@ -592,153 +711,368 @@ app.get('/api/report', (req, res) => {
 
 // ── Modifier: Preset CRUD ─────────────────────────────────────────────────
 
-app.get('/api/modifier/presets', wrapAsync(async (req, res) => {
-  res.json(await listPresets());
-}));
+app.get(
+  "/api/modifier/presets",
+  wrapAsync(async (req, res) => {
+    res.json(await listPresets());
+  }),
+);
 
-app.post('/api/modifier/presets', wrapAsync(async (req, res) => {
-  const { name, mcVersion, loader } = req.body;
-  const preset = await createPreset(name, mcVersion, loader);
-  res.json(preset);
-}));
+app.post(
+  "/api/modifier/presets",
+  wrapAsync(async (req, res) => {
+    const { name, mcVersion, loader } = req.body;
+    const preset = await createPreset(name, mcVersion, loader);
+    res.json(preset);
+  }),
+);
 
-app.get('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
-  res.json(await getPreset(req.params.id));
-}));
+app.get(
+  "/api/modifier/presets/:id",
+  wrapAsync(async (req, res) => {
+    res.json(await getPreset(req.params.id));
+  }),
+);
 
-app.patch('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
-  res.json(await updatePreset(req.params.id, req.body));
-}));
+app.patch(
+  "/api/modifier/presets/:id",
+  wrapAsync(async (req, res) => {
+    res.json(await updatePreset(req.params.id, req.body));
+  }),
+);
 
-app.delete('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
-  await deletePreset(req.params.id);
-  res.json({ success: true });
-}));
+app.delete(
+  "/api/modifier/presets/:id",
+  wrapAsync(async (req, res) => {
+    await deletePreset(req.params.id);
+    res.json({ success: true });
+  }),
+);
 
 // ── Modifier: CurseForge search ───────────────────────────────────────────
 
-app.get('/api/modifier/search', wrapAsync(async (req, res) => {
-  const { q, mcVersion, loader } = req.query;
-  if (!q) { res.status(400).json({ error: 'Missing search query' }); return; }
-  const results = await searchMods(q, mcVersion || '', loader || '', 20);
-  res.json(results);
-}));
+app.get(
+  "/api/modifier/search",
+  wrapAsync(async (req, res) => {
+    const { q, mcVersion, loader } = req.query;
+    if (!q) {
+      res.status(400).json({ error: "Missing search query" });
+      return;
+    }
+    const results = await searchMods(q, mcVersion || "", loader || "", 20);
+    res.json(results);
+  }),
+);
 
-app.get('/api/modifier/mod-files/:addonId', wrapAsync(async (req, res) => {
-  const { mcVersion, loader } = req.query;
-  const loaderType = LOADER_MAP[(loader || '').toLowerCase()] || 0;
-  const files = await getModFiles(req.params.addonId, mcVersion || '', loaderType, loader || '');
-  res.json(files);
-}));
+app.get(
+  "/api/modifier/mod-files/:addonId",
+  wrapAsync(async (req, res) => {
+    const { mcVersion, loader } = req.query;
+    const loaderType = LOADER_MAP[(loader || "").toLowerCase()] || 0;
+    const files = await getModFiles(
+      req.params.addonId,
+      mcVersion || "",
+      loaderType,
+      loader || "",
+    );
+    res.json(files);
+  }),
+);
 
 // ── Modifier: Preset mods ─────────────────────────────────────────────────
 
-app.post('/api/modifier/presets/:id/mods', wrapAsync(async (req, res) => {
-  const preset = await addModToPreset(req.params.id, req.body);
-  res.json(preset);
-}));
+app.post(
+  "/api/modifier/presets/:id/mods",
+  wrapAsync(async (req, res) => {
+    const preset = await addModToPreset(req.params.id, req.body);
+    res.json(preset);
+  }),
+);
 
-app.delete('/api/modifier/presets/:id/mods/:addonId', wrapAsync(async (req, res) => {
-  const addonId = parseInt(req.params.addonId, 10);
-  if (Number.isNaN(addonId)) { res.status(400).json({ error: 'Invalid addonId' }); return; }
-  const preset = await removeModFromPreset(req.params.id, addonId);
-  res.json(preset);
-}));
+app.delete(
+  "/api/modifier/presets/:id/mods/:addonId",
+  wrapAsync(async (req, res) => {
+    const addonId = parseInt(req.params.addonId, 10);
+    if (Number.isNaN(addonId)) {
+      res.status(400).json({ error: "Invalid addonId" });
+      return;
+    }
+    const preset = await removeModFromPreset(req.params.id, addonId);
+    res.json(preset);
+  }),
+);
 
 // ── Modifier: Config management ───────────────────────────────────────────
 
-app.post('/api/modifier/presets/:id/configs/import', wrapAsync(async (req, res) => {
-  const { folderPath } = req.body;
-  if (!folderPath) { res.status(400).json({ error: 'Missing folderPath' }); return; }
-  const imported = await importConfigsFromFolder(req.params.id, folderPath);
-  res.json(imported);
-}));
-
-app.post('/api/modifier/presets/:id/configs/upload', wrapAsync(async (req, res) => {
-  const { targetPath, content } = req.body;
-  if (!targetPath) { res.status(400).json({ error: 'Missing targetPath' }); return; }
-  const entry = await uploadConfig(req.params.id, targetPath, content || '');
-  res.json(entry);
-}));
-
-app.get('/api/modifier/presets/:id/configs', wrapAsync(async (req, res) => {
-  res.json(await listConfigs(req.params.id));
-}));
-
-app.get('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath.join('/');
-  const content = await readConfig(req.params.id, targetPath);
-  res.json({ targetPath, content });
-}));
-
-app.put('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath.join('/');
-  const { content } = req.body;
-  const entry = await saveConfig(req.params.id, targetPath, content || '');
-  res.json(entry);
-}));
-
-app.delete('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath.join('/');
-  await deleteConfig(req.params.id, targetPath);
-  res.json({ success: true });
-}));
-
-app.post('/api/modifier/presets/:id/configs/open', wrapAsync(async (req, res) => {
-  const { targetPath } = req.body;
-  if (!targetPath) { res.status(400).json({ error: 'Missing targetPath' }); return; }
-  const absPath = resolveConfigPath(req.params.id, targetPath);
-
-  try {
-    await access(absPath);
-  } catch {
-    res.status(404).json({ error: 'File not found' });
-    return;
-  }
-
-  const hasVSCode = await checkVSCode();
-  let bin, args;
-
-  if (hasVSCode) {
-    bin = 'code';
-    args = ['--goto', `"${absPath}:1"`];
-  } else {
-    const platform = process.platform;
-    if (platform === 'win32') {
-      bin = 'cmd';
-      args = ['/c', 'start', '""', absPath];
-    } else if (platform === 'darwin') {
-      bin = 'open';
-      args = [absPath];
-    } else {
-      bin = 'xdg-open';
-      args = [absPath];
-    }
-  }
-
-  const opts = hasVSCode && process.platform === 'win32' ? { shell: true } : {};
-  execFile(bin, args, opts, (err) => {
-    if (err) {
-      res.status(500).json({ error: `Failed to open file: ${err.message}` });
+app.post(
+  "/api/modifier/presets/:id/configs/import",
+  wrapAsync(async (req, res) => {
+    const { folderPath } = req.body;
+    if (!folderPath) {
+      res.status(400).json({ error: "Missing folderPath" });
       return;
     }
+    const imported = await importConfigsFromFolder(req.params.id, folderPath);
+    res.json(imported);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/configs/import-file",
+  wrapAsync(async (req, res) => {
+    const { filePath } = req.body;
+    if (!filePath) {
+      res.status(400).json({ error: "Missing filePath" });
+      return;
+    }
+    const entry = await importSingleConfigFile(req.params.id, filePath);
+    res.json(entry);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/configs/upload",
+  wrapAsync(async (req, res) => {
+    const { targetPath, content } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const entry = await uploadConfig(req.params.id, targetPath, content || "");
+    res.json(entry);
+  }),
+);
+
+app.get(
+  "/api/modifier/presets/:id/configs",
+  wrapAsync(async (req, res) => {
+    res.json(await listConfigs(req.params.id));
+  }),
+);
+
+app.get(
+  "/api/modifier/presets/:id/configs/{*configPath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.configPath.join("/");
+    const content = await readConfig(req.params.id, targetPath);
+    res.json({ targetPath, content });
+  }),
+);
+
+app.put(
+  "/api/modifier/presets/:id/configs/{*configPath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.configPath.join("/");
+    const { content } = req.body;
+    const entry = await saveConfig(req.params.id, targetPath, content || "");
+    res.json(entry);
+  }),
+);
+
+app.delete(
+  "/api/modifier/presets/:id/configs/{*configPath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.configPath.join("/");
+    await deleteConfig(req.params.id, targetPath);
     res.json({ success: true });
-  });
-}));
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/configs/open",
+  wrapAsync(async (req, res) => {
+    const { targetPath } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const absPath = resolveConfigPath(req.params.id, targetPath);
+    await openFileExternally(absPath, res);
+  }),
+);
+
+// ── Modifier: KubeJS management ────────────────────────────────────────────
+
+app.get(
+  "/api/modifier/presets/:id/kubejs",
+  wrapAsync(async (req, res) => {
+    res.json(await listKubejs(req.params.id));
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/kubejs/import",
+  wrapAsync(async (req, res) => {
+    const { folderPath } = req.body;
+    if (!folderPath) {
+      res.status(400).json({ error: "Missing folderPath" });
+      return;
+    }
+    const imported = await importKubejsFromFolder(req.params.id, folderPath);
+    res.json(imported);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/kubejs/import-file",
+  wrapAsync(async (req, res) => {
+    const { filePath } = req.body;
+    if (!filePath) {
+      res.status(400).json({ error: "Missing filePath" });
+      return;
+    }
+    const entry = await importSingleKubejsFile(req.params.id, filePath);
+    res.json(entry);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/kubejs/upload",
+  express.json({ limit: "10mb" }),
+  wrapAsync(async (req, res) => {
+    const { targetPath, content, binary } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const entry = await uploadKubejs(
+      req.params.id,
+      targetPath,
+      content || "",
+      !!binary,
+    );
+    res.json(entry);
+  }),
+);
+
+app.get(
+  "/api/modifier/presets/:id/kubejs/read/{*filePath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.filePath.join("/");
+    const content = await readKubejs(req.params.id, targetPath);
+    res.json({ targetPath, content });
+  }),
+);
+
+app.put(
+  "/api/modifier/presets/:id/kubejs/{*filePath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.filePath.join("/");
+    const { content } = req.body;
+    const entry = await saveKubejs(req.params.id, targetPath, content || "");
+    res.json(entry);
+  }),
+);
+
+app.delete(
+  "/api/modifier/presets/:id/kubejs/{*filePath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.filePath.join("/");
+    await deleteKubejs(req.params.id, targetPath);
+    res.json({ success: true });
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/kubejs/open",
+  wrapAsync(async (req, res) => {
+    const { targetPath } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const absPath = resolveKubejsPath(req.params.id, targetPath);
+    await openFileExternally(absPath, res);
+  }),
+);
+
+// ── Modifier: Resource Pack management ────────────────────────────────────
+
+app.get(
+  "/api/modifier/presets/:id/resourcepacks",
+  wrapAsync(async (req, res) => {
+    res.json(await listResourcepacks(req.params.id));
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/resourcepacks/import",
+  wrapAsync(async (req, res) => {
+    const { folderPath } = req.body;
+    if (!folderPath) {
+      res.status(400).json({ error: "Missing folderPath" });
+      return;
+    }
+    const imported = await importResourcepacksFromFolder(
+      req.params.id,
+      folderPath,
+    );
+    res.json(imported);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/resourcepacks/upload",
+  express.json({ limit: "10mb" }),
+  wrapAsync(async (req, res) => {
+    const { targetPath, content } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const entry = await uploadResourcepack(
+      req.params.id,
+      targetPath,
+      content || "",
+    );
+    res.json(entry);
+  }),
+);
+
+app.delete(
+  "/api/modifier/presets/:id/resourcepacks/{*filePath}",
+  wrapAsync(async (req, res) => {
+    const targetPath = req.params.filePath.join("/");
+    await deleteResourcepack(req.params.id, targetPath);
+    res.json({ success: true });
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/resourcepacks/open",
+  wrapAsync(async (req, res) => {
+    const { targetPath } = req.body;
+    if (!targetPath) {
+      res.status(400).json({ error: "Missing targetPath" });
+      return;
+    }
+    const absPath = resolveResourcepackPath(req.params.id, targetPath);
+    await openFileExternally(absPath, res);
+  }),
+);
 
 // ── Modifier: Download + Apply ────────────────────────────────────────────
 
-app.post('/api/modifier/presets/:id/download-mods', wrapAsync(async (req, res) => {
-  const results = await downloadPresetMods(req.params.id);
-  res.json(results);
-}));
+app.post(
+  "/api/modifier/presets/:id/download-mods",
+  wrapAsync(async (req, res) => {
+    const results = await downloadPresetMods(req.params.id);
+    res.json(results);
+  }),
+);
 
-app.post('/api/modifier/presets/:id/apply', wrapAsync(async (req, res) => {
-  const { instanceName } = req.body;
-  if (!instanceName) { res.status(400).json({ error: 'Missing instanceName' }); return; }
-  const result = await applyPresetToInstance(req.params.id, instanceName);
-  res.json(result);
-}));
+app.post(
+  "/api/modifier/presets/:id/apply",
+  wrapAsync(async (req, res) => {
+    const { instanceName } = req.body;
+    if (!instanceName) {
+      res.status(400).json({ error: "Missing instanceName" });
+      return;
+    }
+    const result = await applyPresetToInstance(req.params.id, instanceName);
+    res.json(result);
+  }),
+);
 
 // Centralized error handler for async /api routes
 app.use((err, req, res, _next) => {
@@ -747,11 +1081,11 @@ app.use((err, req, res, _next) => {
 });
 
 // SPA fallback — must come after all /api routes
-app.get('/{*path}', (req, res) => {
+app.get("/{*path}", (req, res) => {
   if (isDev) {
-    res.redirect('http://localhost:5173');
+    res.redirect("http://localhost:5173");
   } else {
-    res.sendFile(join(__dirname, 'client', 'dist', 'index.html'));
+    res.sendFile(join(__dirname, "client", "dist", "index.html"));
   }
 });
 
@@ -761,7 +1095,7 @@ app.get('/{*path}', (req, res) => {
   try {
     await pruneCache();
   } catch (err) {
-    console.warn('Cache prune failed:', err.message);
+    console.warn("Cache prune failed:", err.message);
   }
 
   // Auto-select first available instance
@@ -771,10 +1105,10 @@ app.get('/{*path}', (req, res) => {
       selectedInstancePath = instances[0].path;
       console.log(`Auto-selected instance: ${instances[0].name}`);
     } else {
-      console.warn('No CurseForge instances found in', INSTANCES_ROOT);
+      console.warn("No CurseForge instances found in", INSTANCES_ROOT);
     }
   } catch (err) {
-    console.warn('Failed to auto-detect instances:', err.message);
+    console.warn("Failed to auto-detect instances:", err.message);
   }
 
   app.listen(PORT, () => {

@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { useConfigs } from '../../hooks/useConfigs';
-import { saveConfigContent, openConfigFile } from '../../api/modifier-endpoints';
+import { useKubejs } from '../../hooks/useKubejs';
+import { saveKubejsContent, openKubejsFile } from '../../api/modifier-endpoints';
 import { formatBytes } from '../../utils/format';
 import { buildTree, type TreeNode } from '../../utils/buildTree';
 import type { PresetConfigEntry, ModalState } from '../../types';
 
-interface ConfigTreeProps {
+interface KubejsTreeProps {
   presetId: string;
-  configs: PresetConfigEntry[];
+  kubejs: PresetConfigEntry[];
   onRefresh: () => Promise<void>;
   openModal: (m: ModalState) => void;
 }
@@ -19,6 +19,7 @@ function TreeItem({ node, depth, onOpen, onEdit, onDelete, busyPath, busyAction 
 }) {
   const [expanded, setExpanded] = useState(depth < 2);
   const isBusy = busyPath === node.fullPath;
+  const canEdit = node.isText !== false;
 
   if (node.isDir) {
     return (
@@ -47,13 +48,18 @@ function TreeItem({ node, depth, onOpen, onEdit, onDelete, busyPath, busyAction 
       {node.sizeBytes !== undefined && (
         <span className="text-[0.75rem] text-muted">{formatBytes(node.sizeBytes)}</span>
       )}
+      {!canEdit && (
+        <span className="text-[0.7rem] text-warning/70">(binary)</span>
+      )}
       <div className={`ml-auto flex gap-2 transition-opacity ${isBusy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
         {isBusy ? (
           <span className="text-muted text-[0.75rem]">{busyAction === 'delete' ? 'Deleting...' : busyAction === 'open' ? 'Opening...' : 'Loading...'}</span>
         ) : (
           <>
             <button onClick={() => onOpen(node.fullPath)} disabled={!!busyPath} className="text-success text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Open</button>
-            <button onClick={() => onEdit(node.fullPath)} disabled={!!busyPath} className="text-info text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Edit</button>
+            {canEdit && (
+              <button onClick={() => onEdit(node.fullPath)} disabled={!!busyPath} className="text-info text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Edit</button>
+            )}
             <button onClick={() => onDelete(node.fullPath)} disabled={!!busyPath} className="text-danger text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Delete</button>
           </>
         )}
@@ -62,18 +68,20 @@ function TreeItem({ node, depth, onOpen, onEdit, onDelete, busyPath, busyAction 
   );
 }
 
-export default function ConfigTree({ presetId, configs, onRefresh, openModal }: ConfigTreeProps) {
-  const { readFile, deleteFile } = useConfigs(presetId);
+export default function KubejsTree({ presetId, kubejs, onRefresh, openModal }: KubejsTreeProps) {
+  const { readFile, deleteFile } = useKubejs(presetId);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<'open' | 'edit' | 'delete' | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleOpen = async (targetPath: string) => {
     setBusyPath(targetPath);
     setBusyAction('open');
+    setError(null);
     try {
-      await openConfigFile(presetId, targetPath);
-    } catch {
-      // ignore — file may not have an associated editor
+      await openKubejsFile(presetId, targetPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open file');
     } finally {
       setBusyPath(null);
       setBusyAction(null);
@@ -83,6 +91,7 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
   const handleEdit = async (targetPath: string) => {
     setBusyPath(targetPath);
     setBusyAction('edit');
+    setError(null);
     try {
       const content = await readFile(targetPath);
       openModal({
@@ -91,12 +100,12 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
         targetPath,
         content,
         onSave: async (newContent: string) => {
-          await saveConfigContent(presetId, targetPath, newContent);
+          await saveKubejsContent(presetId, targetPath, newContent);
           await onRefresh();
         },
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load file');
     } finally {
       setBusyPath(null);
       setBusyAction(null);
@@ -106,22 +115,26 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
   const handleDelete = async (targetPath: string) => {
     setBusyPath(targetPath);
     setBusyAction('delete');
+    setError(null);
     try {
       await deleteFile(targetPath, onRefresh);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete file');
     } finally {
       setBusyPath(null);
       setBusyAction(null);
     }
   };
 
-  if (configs.length === 0) {
-    return <div className="text-muted text-[0.8rem] py-2">No config files. Use import or upload above.</div>;
+  if (kubejs.length === 0) {
+    return <div className="text-muted text-[0.8rem] py-2">No KubeJS files. Use import or upload above.</div>;
   }
 
-  const tree = buildTree(configs);
+  const tree = buildTree(kubejs);
 
   return (
     <div className="bg-bg rounded-lg p-3 mt-2">
+      {error && <div className="text-danger text-[0.8rem] mb-2">{error}</div>}
       {tree.map(node => (
         <TreeItem key={node.fullPath} node={node} depth={0} onOpen={handleOpen} onEdit={handleEdit} onDelete={handleDelete} busyPath={busyPath} busyAction={busyAction} />
       ))}

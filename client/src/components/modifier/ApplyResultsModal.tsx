@@ -14,6 +14,10 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
   const modFailCount = result.mods.filter(m => !m.success).length;
   const configSuccessCount = result.configs.filter(c => c.success).length;
   const configFailCount = result.configs.filter(c => !c.success).length;
+  const kubejsSuccessCount = result.kubejs.filter(k => k.success).length;
+  const kubejsFailCount = result.kubejs.filter(k => !k.success).length;
+  const rpSuccessCount = result.resourcepacks.filter(r => r.success).length;
+  const rpFailCount = result.resourcepacks.filter(r => !r.success).length;
 
   const hasErrors = result.errors.length > 0;
 
@@ -58,6 +62,38 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
             </div>
           ))}
         </div>
+
+        {/* KubeJS results */}
+        {result.kubejs.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">KubeJS</h4>
+            <div className="text-[0.85rem]">
+              <span className="text-success">{kubejsSuccessCount} copied</span>
+              {kubejsFailCount > 0 && <span className="text-danger ml-3">{kubejsFailCount} failed</span>}
+            </div>
+            {result.kubejs.filter(k => !k.success).map(k => (
+              <div key={k.targetPath} className="text-danger text-[0.8rem] mt-1">
+                {k.targetPath}: {k.error}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Resource Pack results */}
+        {result.resourcepacks.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">Resource Packs</h4>
+            <div className="text-[0.85rem]">
+              <span className="text-success">{rpSuccessCount} copied</span>
+              {rpFailCount > 0 && <span className="text-danger ml-3">{rpFailCount} failed</span>}
+            </div>
+            {result.resourcepacks.filter(r => !r.success).map(r => (
+              <div key={r.targetPath} className="text-danger text-[0.8rem] mt-1">
+                {r.targetPath}: {r.error}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Errors */}
         {hasErrors && (
