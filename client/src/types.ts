@@ -3,6 +3,8 @@
 export interface Instance {
   name: string;
   path: string;
+  mcVersion: string;
+  loaderName: string;
 }
 
 export interface InstanceMeta {
@@ -146,7 +148,91 @@ export type ModalState =
   | { type: 'deps'; addonId: number; modName: string }
   | { type: 'changelog'; addonId: number; modName: string }
   | { type: 'apply'; mods: { addonId: number; oldFileName: string; newFileName: string }[]; extraDeps: ModItem[]; title: string; onConfirm: () => void }
-  | { type: 'settings' };
+  | { type: 'settings' }
+  | { type: 'mod-file-picker'; addonId: number; modName: string; presetId: string; mcVersion: string; loader: string; onAdded: () => void }
+  | { type: 'config-editor'; presetId: string; targetPath: string; content: string; onSave: (content: string) => Promise<void> }
+  | { type: 'apply-results'; result: ApplyPresetResult };
+
+// ── Modifier types ────────────────────────────────────────────────────────
+
+export interface PresetSummary {
+  id: string;
+  name: string;
+  mcVersion: string;
+  loader: string;
+  modCount: number;
+  configCount: number;
+  createdAt: string;
+}
+
+export interface PresetMod {
+  addonId: number;
+  name: string;
+  fileId: number;
+  fileName: string;
+  downloadUrl: string;
+  thumbnailUrl?: string;
+}
+
+export interface PresetConfigEntry {
+  targetPath: string;
+  sizeBytes: number;
+}
+
+export interface Preset {
+  id: string;
+  name: string;
+  description: string;
+  mcVersion: string;
+  loader: string;
+  createdAt: string;
+  mods: PresetMod[];
+  configs: PresetConfigEntry[];
+}
+
+export interface CfSearchResult {
+  id: number;
+  name: string;
+  slug: string;
+  summary: string;
+  downloadCount: number;
+  authors: { name: string }[];
+  logo?: { thumbnailUrl: string };
+  categories: { name: string }[];
+}
+
+export interface CfModFile {
+  id: number;
+  displayName: string;
+  fileName: string;
+  fileDate: string;
+  downloadUrl: string;
+  gameVersions: string[];
+  fileLength: number;
+}
+
+export interface ApplyModResult {
+  addonId: number;
+  fileName: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface ApplyConfigResult {
+  targetPath: string;
+  action: 'merged' | 'replaced' | 'created';
+  backedUp: boolean;
+  success: boolean;
+  error?: string;
+}
+
+export interface ApplyPresetResult {
+  presetName: string;
+  instanceName: string;
+  mods: ApplyModResult[];
+  configs: ApplyConfigResult[];
+  errors: string[];
+}
 
 // ── App state ──────────────────────────────────────────────────────────────
 

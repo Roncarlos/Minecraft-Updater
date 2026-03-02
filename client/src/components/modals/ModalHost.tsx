@@ -4,6 +4,9 @@ import DepsModal from './DepsModal';
 import ChangelogModal from './ChangelogModal';
 import ApplyConfirmModal from './ApplyConfirmModal';
 import SettingsModal from './SettingsModal';
+import ModFilePickerModal from '../modifier/ModFilePickerModal';
+import ConfigEditorModal from '../modifier/ConfigEditorModal';
+import ApplyResultsModal from '../modifier/ApplyResultsModal';
 
 interface ModalHostProps {
   modal: ModalState;
@@ -23,5 +26,11 @@ export default function ModalHost({ modal }: ModalHostProps) {
       return <ApplyConfirmModal title={modal.title} mods={modal.mods} extraDeps={modal.extraDeps} onConfirm={modal.onConfirm} />;
     case 'settings':
       return <SettingsModal />;
+    case 'mod-file-picker':
+      return <ModFilePickerModal addonId={modal.addonId} modName={modal.modName} presetId={modal.presetId} mcVersion={modal.mcVersion} loader={modal.loader} onAdded={modal.onAdded} />;
+    case 'config-editor':
+      return <ConfigEditorModal targetPath={modal.targetPath} content={modal.content} onSave={modal.onSave} />;
+    case 'apply-results':
+      return <ApplyResultsModal result={modal.result} />;
   }
 }

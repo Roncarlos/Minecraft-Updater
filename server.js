@@ -8,9 +8,20 @@ import { listInstances, loadInstance, scanConfigRefs, runScan, pruneCache } from
 import { downloadMod, applyMod, downloadBulk, applyBulk, rollbackMod, rollbackBulk, getDownloadState } from './lib/downloader.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 import { buildReport } from './lib/report.js';
+import {
+  listPresets, createPreset, getPreset, updatePreset, deletePreset,
+  addModToPreset, removeModFromPreset,
+  listConfigs, importConfigsFromFolder, uploadConfig, readConfig, saveConfig, deleteConfig,
+  downloadPresetMods, applyPreset as applyPresetToInstance,
+} from './lib/modifier.js';
+import { searchMods, getModFiles, LOADER_MAP } from './lib/curseforge.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+// Wrap async route handlers to forward errors consistently
+const wrapAsync = (fn) => (req, res, next) =>
+  Promise.resolve(fn(req, res, next)).catch(next);
 
 app.use(express.json());
 app.use(express.static(join(__dirname, 'client', 'dist')));
@@ -573,6 +584,120 @@ app.get('/api/report', (req, res) => {
     return;
   }
   res.json(buildReport(lastScanResults, lastConfigRefs, lastRefSeverity));
+});
+
+// ── Modifier: Preset CRUD ─────────────────────────────────────────────────
+
+app.get('/api/modifier/presets', wrapAsync(async (req, res) => {
+  res.json(await listPresets());
+}));
+
+app.post('/api/modifier/presets', wrapAsync(async (req, res) => {
+  const { name, mcVersion, loader } = req.body;
+  const preset = await createPreset(name, mcVersion, loader);
+  res.json(preset);
+}));
+
+app.get('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
+  res.json(await getPreset(req.params.id));
+}));
+
+app.patch('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
+  res.json(await updatePreset(req.params.id, req.body));
+}));
+
+app.delete('/api/modifier/presets/:id', wrapAsync(async (req, res) => {
+  await deletePreset(req.params.id);
+  res.json({ success: true });
+}));
+
+// ── Modifier: CurseForge search ───────────────────────────────────────────
+
+app.get('/api/modifier/search', wrapAsync(async (req, res) => {
+  const { q, mcVersion, loader } = req.query;
+  if (!q) { res.status(400).json({ error: 'Missing search query' }); return; }
+  const results = await searchMods(q, mcVersion || '', loader || '', 20);
+  res.json(results);
+}));
+
+app.get('/api/modifier/mod-files/:addonId', wrapAsync(async (req, res) => {
+  const { mcVersion, loader } = req.query;
+  const loaderType = LOADER_MAP[(loader || '').toLowerCase()] || 0;
+  const files = await getModFiles(req.params.addonId, mcVersion || '', loaderType, loader || '');
+  res.json(files);
+}));
+
+// ── Modifier: Preset mods ─────────────────────────────────────────────────
+
+app.post('/api/modifier/presets/:id/mods', wrapAsync(async (req, res) => {
+  const preset = await addModToPreset(req.params.id, req.body);
+  res.json(preset);
+}));
+
+app.delete('/api/modifier/presets/:id/mods/:addonId', wrapAsync(async (req, res) => {
+  const addonId = parseInt(req.params.addonId, 10);
+  if (Number.isNaN(addonId)) { res.status(400).json({ error: 'Invalid addonId' }); return; }
+  const preset = await removeModFromPreset(req.params.id, addonId);
+  res.json(preset);
+}));
+
+// ── Modifier: Config management ───────────────────────────────────────────
+
+app.post('/api/modifier/presets/:id/configs/import', wrapAsync(async (req, res) => {
+  const { folderPath } = req.body;
+  if (!folderPath) { res.status(400).json({ error: 'Missing folderPath' }); return; }
+  const imported = await importConfigsFromFolder(req.params.id, folderPath);
+  res.json(imported);
+}));
+
+app.post('/api/modifier/presets/:id/configs/upload', wrapAsync(async (req, res) => {
+  const { targetPath, content } = req.body;
+  if (!targetPath) { res.status(400).json({ error: 'Missing targetPath' }); return; }
+  const entry = await uploadConfig(req.params.id, targetPath, content || '');
+  res.json(entry);
+}));
+
+app.get('/api/modifier/presets/:id/configs', wrapAsync(async (req, res) => {
+  res.json(await listConfigs(req.params.id));
+}));
+
+app.get('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
+  const targetPath = req.params.configPath;
+  const content = await readConfig(req.params.id, targetPath);
+  res.json({ targetPath, content });
+}));
+
+app.put('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
+  const targetPath = req.params.configPath;
+  const { content } = req.body;
+  const entry = await saveConfig(req.params.id, targetPath, content || '');
+  res.json(entry);
+}));
+
+app.delete('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
+  const targetPath = req.params.configPath;
+  await deleteConfig(req.params.id, targetPath);
+  res.json({ success: true });
+}));
+
+// ── Modifier: Download + Apply ────────────────────────────────────────────
+
+app.post('/api/modifier/presets/:id/download-mods', wrapAsync(async (req, res) => {
+  const results = await downloadPresetMods(req.params.id);
+  res.json(results);
+}));
+
+app.post('/api/modifier/presets/:id/apply', wrapAsync(async (req, res) => {
+  const { instanceName } = req.body;
+  if (!instanceName) { res.status(400).json({ error: 'Missing instanceName' }); return; }
+  const result = await applyPresetToInstance(req.params.id, instanceName);
+  res.json(result);
+}));
+
+// Centralized error handler for async /api routes
+app.use((err, req, res, _next) => {
+  const status = err.status || 500;
+  res.status(status).json({ error: err.message });
 });
 
 // SPA fallback — must come after all /api routes
