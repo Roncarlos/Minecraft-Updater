@@ -2,6 +2,7 @@ import { useReducer, useState, useEffect, useCallback, useMemo } from 'react';
 import { AppContext, appReducer, initialState } from './context';
 import { fetchInstances, fetchSettings, fetchInstance } from './api/endpoints';
 import { isLlmConfigured } from './utils/llmConfigured';
+import { useLlmHeartbeat } from './hooks/useLlmHeartbeat';
 import Header from './components/layout/Header';
 import ControlsBar from './components/layout/ControlsBar';
 import ProgressBar from './components/layout/ProgressBar';
@@ -13,6 +14,7 @@ import type { ModalState } from './types';
 export default function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
+  useLlmHeartbeat(state.llmConfigured, dispatch);
 
   // Load instances + settings on mount
   useEffect(() => {

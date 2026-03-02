@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { AppState, ModalState, Instance, InstanceMeta, ScanProgress, ScanResults, DownloadStateMap, Settings } from './types';
+import type { AppState, ModalState, Instance, InstanceMeta, ScanProgress, ScanResults, DownloadStateMap, Settings, LlmStatus } from './types';
 
 export const initialState: AppState = {
   instances: [],
@@ -11,6 +11,7 @@ export const initialState: AppState = {
   downloadState: {},
   settings: null,
   llmConfigured: false,
+  llmStatus: 'unknown',
 };
 
 export type AppAction =
@@ -24,7 +25,8 @@ export type AppAction =
   | { type: 'MERGE_DOWNLOAD_STATE'; state: DownloadStateMap }
   | { type: 'REMOVE_FROM_DOWNLOAD_STATE'; addonIds: string[] }
   | { type: 'SET_SETTINGS'; settings: Settings }
-  | { type: 'SET_LLM_CONFIGURED'; value: boolean };
+  | { type: 'SET_LLM_CONFIGURED'; value: boolean }
+  | { type: 'SET_LLM_STATUS'; status: LlmStatus };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
@@ -52,7 +54,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_SETTINGS':
       return { ...state, settings: action.settings };
     case 'SET_LLM_CONFIGURED':
-      return { ...state, llmConfigured: action.value };
+      return { ...state, llmConfigured: action.value, llmStatus: action.value ? state.llmStatus : 'unknown' };
+    case 'SET_LLM_STATUS':
+      return { ...state, llmStatus: action.status };
     default:
       return state;
   }

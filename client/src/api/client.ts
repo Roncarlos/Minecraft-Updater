@@ -4,8 +4,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function get<T>(url: string): Promise<T> {
-  const resp = await fetch(url);
+export async function get<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const resp = await fetch(url, { signal });
   if (!resp.ok) {
     const body = await resp.text().catch(() => '');
     let msg: string;

@@ -78,3 +78,13 @@ export const testLlmConnection = () =>
 
 export const detectConcurrency = () =>
   get<{ success: boolean; instances?: number; models?: string[]; error?: string }>('/api/settings/detect-concurrency');
+
+// ── LLM health ────────────────────────────────────────────────────────────
+
+type LlmHealthResponse =
+  | { status: 'online'; model: string }
+  | { status: 'offline'; error: string }
+  | { status: 'unconfigured' };
+
+export const checkLlmHealth = (signal?: AbortSignal) =>
+  get<LlmHealthResponse>('/api/llm/health', signal);

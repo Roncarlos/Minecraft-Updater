@@ -132,7 +132,7 @@ export default function SettingsModal() {
 
           <div className="flex items-center gap-3 mb-2.5">
             <label className="min-w-[100px] text-muted text-[0.85rem] shrink-0">Endpoint</label>
-            <input type="text" {...register('llm.endpoint')} placeholder="http://localhost:1234/v1/chat/completions" className={fieldClass} />
+            <input type="text" {...register('llm.endpoint')} placeholder="http://localhost:1234/v1" className={fieldClass} />
           </div>
 
           <div className="flex items-center gap-3 mb-2.5">

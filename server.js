@@ -403,8 +403,9 @@ app.post('/api/settings/test-llm', async (req, res) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
+    const base = endpoint.replace(/\/+$/, '');
     try {
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(`${base}/chat/completions`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -435,6 +436,36 @@ app.post('/api/settings/test-llm', async (req, res) => {
   }
 });
 
+// ── GET /api/llm/health ──────────────────────────────────────────────────
+app.get('/api/llm/health', async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    const { enabled, endpoint, apiKey, model } = settings.llm;
+    if (!enabled || !endpoint || !model) {
+      res.json({ status: 'unconfigured' });
+      return;
+    }
+
+    const base = endpoint.replace(/\/+$/, '');
+    const headers = {};
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
+      clearTimeout(timeout);
+      res.json(resp.ok ? { status: 'online', model } : { status: 'offline', error: `HTTP ${resp.status}` });
+    } catch {
+      clearTimeout(timeout);
+      res.json({ status: 'offline', error: 'Server unreachable' });
+    }
+  } catch (err) {
+    res.json({ status: 'offline', error: err.message });
+  }
+});
+
 // ── GET /api/settings/detect-concurrency ─────────────────────────────────
 app.get('/api/settings/detect-concurrency', async (req, res) => {
   try {
@@ -445,13 +476,7 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
       return;
     }
 
-    // Derive models URL: replace /chat/completions at end of endpoint with /models
-    const modelsUrl = endpoint.replace(/\/chat\/completions\/?$/, '/models');
-    if (modelsUrl === endpoint) {
-      res.json({ success: false, error: 'Cannot derive models URL from endpoint (expected /chat/completions suffix)' });
-      return;
-    }
-
+    const base = endpoint.replace(/\/+$/, '');
     const headers = {};
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
@@ -459,7 +484,7 @@ app.get('/api/settings/detect-concurrency', async (req, res) => {
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const resp = await fetch(modelsUrl, { headers, signal: controller.signal });
+      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
       clearTimeout(timeout);
 
       if (!resp.ok) {

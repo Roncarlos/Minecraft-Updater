@@ -1,9 +1,26 @@
 import { useState } from 'react';
 import { useScanStream } from '../../hooks/useScanStream';
 import { useAppContext } from '../../context';
+import type { LlmStatus } from '../../types';
 import Button from '../ui/Button';
 import Checkbox from '../ui/Checkbox';
 import NumberInput from '../ui/NumberInput';
+
+const statusConfig: Record<LlmStatus, { color: string; label: string; pulse?: boolean }> = {
+  online:  { color: 'bg-emerald-400', label: 'LLM Online' },
+  offline: { color: 'bg-red-400',     label: 'LLM Offline' },
+  unknown: { color: 'bg-gray-400',    label: 'Checking...', pulse: true },
+};
+
+function LlmStatusDot({ status }: { status: LlmStatus }) {
+  const { color, label, pulse } = statusConfig[status];
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted select-none">
+      <span className={`inline-block w-2 h-2 rounded-full ${color}${pulse ? ' animate-pulse' : ''}`} />
+      {label}
+    </span>
+  );
+}
 
 export default function ControlsBar() {
   const { state, openModal } = useAppContext();
@@ -31,6 +48,7 @@ export default function ControlsBar() {
       <Checkbox label="Check Changelogs" checked={checkChangelogs} onChange={setCheckChangelogs} />
       <NumberInput label="Limit:" value={limit} onChange={setLimit} min={0} placeholder="0=all" />
       <Checkbox label="LLM Analysis" checked={useLlm} onChange={setUseLlm} disabled={!state.llmConfigured} />
+      {state.llmConfigured && <LlmStatusDot status={state.llmStatus} />}
       <Button
         variant="settings"
         size="md"

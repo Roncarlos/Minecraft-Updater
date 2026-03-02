@@ -126,6 +126,10 @@ export interface Settings {
   cache: CacheSettings;
 }
 
+// ── LLM status ──────────────────────────────────────────────────────────────
+
+export type LlmStatus = 'unknown' | 'online' | 'offline';
+
 // ── Refs ───────────────────────────────────────────────────────────────────
 
 export interface RefsResponse {
@@ -156,4 +160,5 @@ export interface AppState {
   downloadState: DownloadStateMap;
   settings: Settings | null;
   llmConfigured: boolean;
+  llmStatus: LlmStatus;
 }
