@@ -319,6 +319,64 @@ async function openFileExternally(absPath, res, line = 1) {
   });
 }
 
+// ── POST /api/browse ─────────────────────────────────────────────────────────
+let browseDialogOpen = false;
+
+app.post(
+  "/api/browse",
+  wrapAsync(async (req, res) => {
+    const { type, initialDir } = req.body;
+    if (type !== "file" && type !== "folder") {
+      res.status(400).json({ error: 'type must be "file" or "folder"' });
+      return;
+    }
+
+    if (process.platform !== "win32") {
+      res.status(501).json({ error: "Browse dialog only supported on Windows" });
+      return;
+    }
+
+    if (browseDialogOpen) {
+      res.status(409).json({ error: "A browse dialog is already open" });
+      return;
+    }
+
+    // Sanitise initialDir for safe PS embedding (escape single quotes)
+    const safeDir =
+      typeof initialDir === "string" && initialDir.trim()
+        ? initialDir.trim().replace(/'/g, "''")
+        : "";
+
+    const script =
+      type === "folder"
+        ? `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.ShowNewFolderButton = $false;${safeDir ? ` $d.SelectedPath = '${safeDir}';` : ""} if ($d.ShowDialog() -eq 'OK') { $d.SelectedPath } else { '' }`
+        : `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Multiselect = $false;${safeDir ? ` $d.InitialDirectory = '${safeDir}';` : ""} if ($d.ShowDialog() -eq 'OK') { $d.FileName } else { '' }`;
+
+    browseDialogOpen = true;
+    try {
+      const result = await new Promise((resolve, reject) => {
+        execFile(
+          "powershell",
+          ["-NoProfile", "-NonInteractive", "-Command", script],
+          { timeout: 120_000 },
+          (err, stdout) => {
+            if (err) {
+              if (err.killed)
+                return reject(new Error("Browse dialog timed out"));
+              return reject(err);
+            }
+            resolve(stdout.trim());
+          },
+        );
+      });
+
+      res.json({ path: result || null });
+    } finally {
+      browseDialogOpen = false;
+    }
+  }),
+);
+
 // ── POST /api/open-file ─────────────────────────────────────────────────────
 app.post("/api/open-file", async (req, res) => {
   const { filePath, line } = req.body;

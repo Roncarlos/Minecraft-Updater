@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import Button from '../ui/Button';
 import { useResourcepacks } from '../../hooks/useResourcepacks';
 import { openResourcepackFile } from '../../api/modifier-endpoints';
+import { useBrowse } from '../../hooks/useBrowse';
 import { formatBytes } from '../../utils/format';
 import type { PresetConfigEntry } from '../../types';
 
@@ -20,11 +21,17 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<'open' | 'delete' | null>(null);
+  const { browsing, error: browseError, browse } = useBrowse();
 
   const handleImport = async () => {
     if (!folderPath.trim()) return;
     await rp.importFromFolder(folderPath.trim(), onRefresh);
     setFolderPath('');
+  };
+
+  const handleBrowse = async () => {
+    const path = await browse('folder', folderPath.trim() || undefined);
+    if (path) setFolderPath(path);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +119,10 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
               placeholder="Absolute folder path (e.g. C:\...\resourcepacks)"
               className={fieldClass}
             />
-            <Button variant="download" size="sm" onClick={handleImport} disabled={rp.importing || !folderPath.trim()}>
+            <Button variant="settings" size="sm" onClick={handleBrowse} disabled={rp.importing || browsing}>
+              {browsing ? 'Browsing...' : 'Browse'}
+            </Button>
+            <Button variant="download" size="sm" onClick={handleImport} disabled={rp.importing || browsing || !folderPath.trim()}>
               {rp.importing ? 'Importing...' : 'Import'}
             </Button>
           </div>
@@ -137,8 +147,8 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
           </div>
         )}
 
-        {rp.error && (
-          <div className="text-danger text-[0.8rem] mt-1">{rp.error}</div>
+        {(rp.error || browseError) && (
+          <div className="text-danger text-[0.8rem] mt-1">{rp.error || browseError}</div>
         )}
       </div>
 

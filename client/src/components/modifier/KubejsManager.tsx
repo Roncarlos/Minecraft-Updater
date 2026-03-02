@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Button from '../ui/Button';
 import { useKubejs } from '../../hooks/useKubejs';
+import { useBrowse } from '../../hooks/useBrowse';
 
 interface KubejsManagerProps {
   presetId: string;
@@ -12,6 +13,7 @@ export default function KubejsManager({ presetId, onRefresh }: KubejsManagerProp
   const [mode, setMode] = useState<'folder' | 'file'>('folder');
   const [folderPath, setFolderPath] = useState('');
   const [filePath, setFilePath] = useState('');
+  const { browsing, error: browseError, browse } = useBrowse();
 
   const handleImportFolder = async () => {
     if (!folderPath.trim()) return;
@@ -23,6 +25,15 @@ export default function KubejsManager({ presetId, onRefresh }: KubejsManagerProp
     if (!filePath.trim()) return;
     await kubejs.importFile(filePath.trim(), onRefresh);
     setFilePath('');
+  };
+
+  const handleBrowse = async (type: 'file' | 'folder') => {
+    const currentDir = type === 'folder' ? folderPath.trim() : filePath.trim();
+    const path = await browse(type, currentDir || undefined);
+    if (path) {
+      if (type === 'folder') setFolderPath(path);
+      else setFilePath(path);
+    }
   };
 
   const fieldClass = "flex-1 bg-bg border border-border text-text px-2.5 py-1.5 rounded text-[0.85rem] font-[inherit] focus:outline-none focus:border-info";
@@ -45,7 +56,10 @@ export default function KubejsManager({ presetId, onRefresh }: KubejsManagerProp
             placeholder="Absolute folder path (e.g. C:\...\kubejs)"
             className={fieldClass}
           />
-          <Button variant="download" size="sm" onClick={handleImportFolder} disabled={kubejs.importing || !folderPath.trim()}>
+          <Button variant="settings" size="sm" onClick={() => handleBrowse('folder')} disabled={kubejs.importing || browsing}>
+            {browsing ? 'Browsing...' : 'Browse'}
+          </Button>
+          <Button variant="download" size="sm" onClick={handleImportFolder} disabled={kubejs.importing || browsing || !folderPath.trim()}>
             {kubejs.importing ? 'Importing...' : 'Import'}
           </Button>
         </div>
@@ -61,7 +75,10 @@ export default function KubejsManager({ presetId, onRefresh }: KubejsManagerProp
               placeholder="Absolute file path (e.g. C:\...\kubejs\client_scripts\main.js)"
               className={fieldClass}
             />
-            <Button variant="download" size="sm" onClick={handleImportFile} disabled={kubejs.importing || !filePath.trim()}>
+            <Button variant="settings" size="sm" onClick={() => handleBrowse('file')} disabled={kubejs.importing || browsing}>
+              {browsing ? 'Browsing...' : 'Browse'}
+            </Button>
+            <Button variant="download" size="sm" onClick={handleImportFile} disabled={kubejs.importing || browsing || !filePath.trim()}>
               {kubejs.importing ? 'Importing...' : 'Import'}
             </Button>
           </div>
@@ -71,8 +88,8 @@ export default function KubejsManager({ presetId, onRefresh }: KubejsManagerProp
         </div>
       )}
 
-      {kubejs.error && (
-        <div className="text-danger text-[0.8rem] mt-1">{kubejs.error}</div>
+      {(kubejs.error || browseError) && (
+        <div className="text-danger text-[0.8rem] mt-1">{kubejs.error || browseError}</div>
       )}
     </div>
   );

@@ -82,6 +82,11 @@ export const detectConcurrency = () =>
 export const fetchModels = () =>
   get<{ success: boolean; models?: string[]; error?: string }>('/api/settings/models');
 
+// ── Browse (native OS dialog) ─────────────────────────────────────────────
+
+export const browsePath = (type: 'file' | 'folder', initialDir?: string) =>
+  post<{ path: string | null }>('/api/browse', { type, initialDir });
+
 // ── LLM health ────────────────────────────────────────────────────────────
 
 type LlmHealthResponse =
