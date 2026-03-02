@@ -247,6 +247,17 @@ export interface ApplyPresetResult {
   errors: string[];
 }
 
+export interface RollbackResult {
+  presetName: string;
+  instanceName: string;
+  mods: number;
+  configs: number;
+  kubejs: number;
+  resourcepacks: number;
+  removed: number;
+  errors: string[];
+}
+
 // ── App state ──────────────────────────────────────────────────────────────
 
 export interface AppState {

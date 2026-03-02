@@ -8,6 +8,7 @@ import type {
   CfModFile,
   ApplyModResult,
   ApplyPresetResult,
+  RollbackResult,
 } from '../types';
 
 // ── Presets ───────────────────────────────────────────────────────────────
@@ -114,5 +115,11 @@ export const openResourcepackFile = (presetId: string, targetPath: string) =>
 export const downloadPresetMods = (presetId: string) =>
   post<ApplyModResult[]>(`/api/modifier/presets/${presetId}/download-mods`, {});
 
-export const applyPreset = (presetId: string, instanceName: string) =>
-  post<ApplyPresetResult>(`/api/modifier/presets/${presetId}/apply`, { instanceName });
+export const applyPreset = (presetId: string, instanceName: string, backup: boolean) =>
+  post<ApplyPresetResult>(`/api/modifier/presets/${presetId}/apply`, { instanceName, backup });
+
+export const rollbackPreset = (presetId: string, instanceName: string) =>
+  post<RollbackResult>(`/api/modifier/presets/${presetId}/rollback`, { instanceName });
+
+export const hasPresetBackup = (presetId: string, instanceName: string) =>
+  get<{ hasBackup: boolean }>(`/api/modifier/presets/${presetId}/has-backup?instanceName=${encodeURIComponent(instanceName)}`);

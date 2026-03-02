@@ -13,6 +13,11 @@ interface InternalNode extends TreeNode {
   childMap: Map<string, InternalNode>;
 }
 
+export function countFiles(node: TreeNode): number {
+  if (!node.isDir) return 1;
+  return node.children.reduce((sum, child) => sum + countFiles(child), 0);
+}
+
 export function buildTree(entries: PresetConfigEntry[]): TreeNode[] {
   const root: InternalNode[] = [];
   const rootMap = new Map<string, InternalNode>();

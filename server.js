@@ -53,6 +53,8 @@ import {
   resolveResourcepackPath,
   downloadPresetMods,
   applyPreset as applyPresetToInstance,
+  rollbackPreset,
+  hasPresetBackup,
 } from "./lib/modifier.js";
 import { searchMods, getModFiles, LOADER_MAP } from "./lib/curseforge.js";
 
@@ -1122,12 +1124,38 @@ app.post(
 app.post(
   "/api/modifier/presets/:id/apply",
   wrapAsync(async (req, res) => {
+    const { instanceName, backup } = req.body;
+    if (!instanceName) {
+      res.status(400).json({ error: "Missing instanceName" });
+      return;
+    }
+    const result = await applyPresetToInstance(req.params.id, instanceName, { backup: !!backup });
+    res.json(result);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/rollback",
+  wrapAsync(async (req, res) => {
     const { instanceName } = req.body;
     if (!instanceName) {
       res.status(400).json({ error: "Missing instanceName" });
       return;
     }
-    const result = await applyPresetToInstance(req.params.id, instanceName);
+    const result = await rollbackPreset(req.params.id, instanceName);
+    res.json(result);
+  }),
+);
+
+app.get(
+  "/api/modifier/presets/:id/has-backup",
+  wrapAsync(async (req, res) => {
+    const { instanceName } = req.query;
+    if (!instanceName || typeof instanceName !== "string") {
+      res.status(400).json({ error: "Missing instanceName" });
+      return;
+    }
+    const result = await hasPresetBackup(req.params.id, instanceName);
     res.json(result);
   }),
 );

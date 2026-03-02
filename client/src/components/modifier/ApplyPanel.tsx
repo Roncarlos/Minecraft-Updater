@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApplyPreset } from '../../hooks/useApplyPreset';
+import { useConfirm } from '../../hooks/useConfirm';
 import Button from '../ui/Button';
 import type { Instance, ModalState } from '../../types';
 
@@ -12,10 +13,17 @@ interface ApplyPanelProps {
   openModal: (m: ModalState) => void;
 }
 
-export default function ApplyPanel({ presetId, mcVersion, loader, instances, openModal }: ApplyPanelProps) {
+export default function ApplyPanel({ presetId, presetName, mcVersion, loader, instances, openModal }: ApplyPanelProps) {
   const [instanceName, setInstanceName] = useState('');
   const [showAll, setShowAll] = useState(false);
-  const { downloading, applying, downloadResults, error, download, apply } = useApplyPreset();
+  const [backup, setBackup] = useState(true);
+  const confirm = useConfirm();
+  const {
+    downloading, applying, downloadResults, error,
+    download, apply,
+    rollingBack, rollbackResult, rollback, clearRollbackResult,
+    hasBackup, checkBackup,
+  } = useApplyPreset();
 
   const lowerLoader = loader.toLowerCase();
   const matching = useMemo(() =>
@@ -28,15 +36,36 @@ export default function ApplyPanel({ presetId, mcVersion, loader, instances, ope
       i.mcVersion !== mcVersion || i.loaderName.toLowerCase() !== lowerLoader
     ), [instances, mcVersion, lowerLoader]);
 
+  useEffect(() => {
+    if (instanceName) {
+      checkBackup(presetId, instanceName);
+      clearRollbackResult();
+    }
+  }, [instanceName, presetId, checkBackup, clearRollbackResult]);
+
   const handleDownload = () => download(presetId);
 
   const handleApply = () => {
     if (!instanceName) return;
-    apply(presetId, instanceName, openModal);
+    apply(presetId, instanceName, backup, openModal);
+  };
+
+  const handleRollback = async () => {
+    if (!instanceName) return;
+    const confirmed = await confirm(
+      `Rollback "${presetName}" on "${instanceName}"? This will restore backed-up files and remove files that were added by the preset.`,
+      { confirmLabel: 'Rollback' },
+    );
+    if (!confirmed) return;
+    await rollback(presetId, instanceName);
   };
 
   const downloadFailed = downloadResults?.some(r => !r.success);
   const downloadOk = downloadResults && !downloadFailed;
+
+  const rollbackTotal = rollbackResult
+    ? rollbackResult.mods + rollbackResult.configs + rollbackResult.kubejs + rollbackResult.resourcepacks
+    : 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,6 +114,16 @@ export default function ApplyPanel({ presetId, mcVersion, loader, instances, ope
         </div>
       )}
 
+      <label className="flex items-center gap-2 text-[0.85rem] text-muted cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={backup}
+          onChange={e => setBackup(e.target.checked)}
+          className="accent-info"
+        />
+        Backup existing files before overwriting
+      </label>
+
       <div className="flex items-center gap-3">
         <Button
           variant="download"
@@ -104,6 +143,17 @@ export default function ApplyPanel({ presetId, mcVersion, loader, instances, ope
           {applying ? 'Applying...' : 'Apply Preset'}
         </Button>
 
+        {hasBackup && (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleRollback}
+            disabled={rollingBack || !instanceName}
+          >
+            {rollingBack ? 'Rolling Back...' : 'Rollback'}
+          </Button>
+        )}
+
         {downloadOk && (
           <span className="text-success text-[0.8rem]">
             All {downloadResults.length} mods downloaded
@@ -115,6 +165,23 @@ export default function ApplyPanel({ presetId, mcVersion, loader, instances, ope
           </span>
         )}
       </div>
+
+      {rollbackResult && rollbackResult.errors.length === 0 && (
+        <div className="text-success text-[0.85rem]">
+          Rolled back {rollbackTotal} file(s) successfully.
+          {rollbackResult.removed > 0 && ` Removed ${rollbackResult.removed} added file(s).`}
+        </div>
+      )}
+      {rollbackResult && rollbackResult.errors.length > 0 && (
+        <div className="text-danger text-[0.85rem]">
+          <p>Rollback completed with {rollbackResult.errors.length} error(s). {rollbackTotal} file(s) restored.</p>
+          <ul className="list-disc pl-4 mt-1">
+            {rollbackResult.errors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && <div className="text-danger text-[0.85rem]">{error}</div>}
     </div>
