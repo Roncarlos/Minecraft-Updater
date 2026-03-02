@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import Button from '../ui/Button';
 import { useResourcepacks } from '../../hooks/useResourcepacks';
 import { openResourcepackFile } from '../../api/modifier-endpoints';
+import { useConfirm } from '../../hooks/useConfirm';
 import { useBrowse } from '../../hooks/useBrowse';
 import { formatBytes } from '../../utils/format';
 import type { PresetConfigEntry } from '../../types';
@@ -14,6 +15,7 @@ interface ResourcepackManagerProps {
 
 export default function ResourcepackManager({ presetId, resourcepacks, onRefresh }: ResourcepackManagerProps) {
   const rp = useResourcepacks(presetId);
+  const confirm = useConfirm();
   const [mode, setMode] = useState<'import' | 'upload'>('import');
   const [folderPath, setFolderPath] = useState('');
   const [fileContent, setFileContent] = useState('');
@@ -76,6 +78,7 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
   };
 
   const handleDelete = async (targetPath: string) => {
+    if (!await confirm(`Delete "${targetPath}"? This cannot be undone.`, { confirmLabel: 'Delete' })) return;
     setBusyPath(targetPath);
     setBusyAction('delete');
     setActionError(null);

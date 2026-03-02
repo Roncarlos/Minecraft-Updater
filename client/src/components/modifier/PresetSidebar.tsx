@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Button from '../ui/Button';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { PresetSummary } from '../../types';
 
 interface PresetSidebarProps {
@@ -13,6 +14,14 @@ interface PresetSidebarProps {
 
 export default function PresetSidebar({ presets, selectedId, onSelect, onCreate, onDelete, loading }: PresetSidebarProps) {
   const [creating, setCreating] = useState(false);
+  const confirm = useConfirm();
+
+  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    if (await confirm(`Delete preset "${name}"? This cannot be undone.`, { confirmLabel: 'Delete' })) {
+      onDelete(id);
+    }
+  };
 
   const handleCreate = async () => {
     setCreating(true);
@@ -57,7 +66,7 @@ export default function PresetSidebar({ presets, selectedId, onSelect, onCreate,
                 </div>
               </div>
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}
+                onClick={(e) => handleDelete(e, p.id, p.name)}
                 className="opacity-0 group-hover:opacity-100 text-danger hover:text-danger cursor-pointer ml-2 shrink-0"
                 title="Delete preset"
               >

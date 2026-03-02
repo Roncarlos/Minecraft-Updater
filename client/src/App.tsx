@@ -12,6 +12,7 @@ import Footer from './components/layout/Footer';
 import ResultsContainer from './components/results/ResultsContainer';
 import ModifierPage from './components/modifier/ModifierPage';
 import ModalHost from './components/modals/ModalHost';
+import { ConfirmProvider } from './hooks/useConfirm';
 import type { ModalState } from './types';
 
 export default function App() {
@@ -57,18 +58,20 @@ export default function App() {
 
   return (
     <AppContext.Provider value={contextValue}>
-      <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
-      {activeTab === 'updater' && (
-        <>
-          <Header />
-          <ControlsBar />
-          <ProgressBar />
-          <ResultsContainer />
-        </>
-      )}
-      {activeTab === 'modifier' && <ModifierPage />}
-      <Footer />
-      <ModalHost modal={modal} />
+      <ConfirmProvider>
+        <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
+        {activeTab === 'updater' && (
+          <>
+            <Header />
+            <ControlsBar />
+            <ProgressBar />
+            <ResultsContainer />
+          </>
+        )}
+        {activeTab === 'modifier' && <ModifierPage />}
+        <Footer />
+        <ModalHost modal={modal} />
+      </ConfirmProvider>
     </AppContext.Provider>
   );
 }

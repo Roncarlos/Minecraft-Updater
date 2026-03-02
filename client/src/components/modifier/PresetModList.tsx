@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { removePresetMod } from '../../api/modifier-endpoints';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { PresetMod } from '../../types';
 
 interface PresetModListProps {
@@ -10,8 +11,10 @@ interface PresetModListProps {
 
 export default function PresetModList({ presetId, mods, onRefresh }: PresetModListProps) {
   const [removing, setRemoving] = useState<number | null>(null);
+  const confirm = useConfirm();
 
-  const handleRemove = async (addonId: number) => {
+  const handleRemove = async (addonId: number, modName: string) => {
+    if (!await confirm(`Remove "${modName}" from this preset? This cannot be undone.`, { confirmLabel: 'Remove' })) return;
     setRemoving(addonId);
     try {
       await removePresetMod(presetId, addonId);
@@ -41,7 +44,7 @@ export default function PresetModList({ presetId, mods, onRefresh }: PresetModLi
             <div className="text-[0.75rem] text-muted truncate">{mod.fileName}</div>
           </div>
           <button
-            onClick={() => handleRemove(mod.addonId)}
+            onClick={() => handleRemove(mod.addonId, mod.name)}
             disabled={removing === mod.addonId}
             className="opacity-0 group-hover:opacity-100 text-danger text-[0.8rem] hover:text-danger cursor-pointer transition-opacity disabled:opacity-40"
             title="Remove mod"

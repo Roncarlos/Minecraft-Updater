@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useConfigs } from '../../hooks/useConfigs';
 import { saveConfigContent, openConfigFile } from '../../api/modifier-endpoints';
+import { useConfirm } from '../../hooks/useConfirm';
 import { formatBytes } from '../../utils/format';
 import { buildTree, type TreeNode } from '../../utils/buildTree';
 import type { PresetConfigEntry, ModalState } from '../../types';
@@ -66,6 +67,7 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
   const { readFile, deleteFile } = useConfigs(presetId);
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<'open' | 'edit' | 'delete' | null>(null);
+  const confirm = useConfirm();
 
   const handleOpen = async (targetPath: string) => {
     setBusyPath(targetPath);
@@ -104,6 +106,7 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
   };
 
   const handleDelete = async (targetPath: string) => {
+    if (!await confirm(`Delete "${targetPath}"? This cannot be undone.`, { confirmLabel: 'Delete' })) return;
     setBusyPath(targetPath);
     setBusyAction('delete');
     try {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useKubejs } from '../../hooks/useKubejs';
 import { saveKubejsContent, openKubejsFile } from '../../api/modifier-endpoints';
+import { useConfirm } from '../../hooks/useConfirm';
 import { formatBytes } from '../../utils/format';
 import { buildTree, type TreeNode } from '../../utils/buildTree';
 import type { PresetConfigEntry, ModalState } from '../../types';
@@ -73,6 +74,7 @@ export default function KubejsTree({ presetId, kubejs, onRefresh, openModal }: K
   const [busyPath, setBusyPath] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<'open' | 'edit' | 'delete' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const handleOpen = async (targetPath: string) => {
     setBusyPath(targetPath);
@@ -113,6 +115,7 @@ export default function KubejsTree({ presetId, kubejs, onRefresh, openModal }: K
   };
 
   const handleDelete = async (targetPath: string) => {
+    if (!await confirm(`Delete "${targetPath}"? This cannot be undone.`, { confirmLabel: 'Delete' })) return;
     setBusyPath(targetPath);
     setBusyAction('delete');
     setError(null);
