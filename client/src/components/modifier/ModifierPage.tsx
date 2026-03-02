@@ -18,7 +18,11 @@ export default function ModifierPage() {
         loading={presets.loading}
       />
       <div className="flex-1">
-        {presets.selected ? (
+        {presets.selecting ? (
+          <div className="flex items-center justify-center h-full text-muted text-[0.9rem]">
+            Loading preset...
+          </div>
+        ) : presets.selected ? (
           <PresetEditor
             key={presets.selected.id}
             preset={presets.selected}

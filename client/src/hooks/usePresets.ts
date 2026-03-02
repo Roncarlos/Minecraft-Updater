@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as api from '../api/modifier-endpoints';
 import type { PresetSummary, Preset } from '../types';
 
@@ -7,6 +7,9 @@ export function usePresets() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Preset | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState(false);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   // Load preset list on mount
   useEffect(() => {
@@ -24,8 +27,10 @@ export function usePresets() {
 
   // Load full preset when selection changes
   useEffect(() => {
-    if (!selectedId) { setSelected(null); return; }
+    if (!selectedId) { setSelected(null); setSelecting(false); return; }
+    if (selectedRef.current?.id === selectedId) return;
     let cancelled = false;
+    setSelecting(true);
     (async () => {
       try {
         const preset = await api.fetchPreset(selectedId);
@@ -33,6 +38,8 @@ export function usePresets() {
       } catch (err) {
         console.warn('Failed to load preset:', err);
         if (!cancelled) { setSelected(null); setSelectedId(null); }
+      } finally {
+        if (!cancelled) setSelecting(false);
       }
     })();
     return () => { cancelled = true; };
@@ -55,8 +62,8 @@ export function usePresets() {
       resourcepackCount: 0,
       createdAt: preset.createdAt,
     }]);
-    setSelectedId(preset.id);
     setSelected(preset);
+    setSelectedId(preset.id);
   }, []);
 
   const update = useCallback(async (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader'>>) => {
@@ -99,5 +106,5 @@ export function usePresets() {
     } catch (err) { console.warn('Failed to refresh preset:', err); }
   }, [selectedId]);
 
-  return { presets, selectedId, selected, loading, select, create, update, remove, refresh };
+  return { presets, selectedId, selected, loading, selecting, select, create, update, remove, refresh };
 }
