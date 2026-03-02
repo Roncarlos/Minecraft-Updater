@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useAppContext } from '../../context';
 import ResultSection from './ResultSection';
 
@@ -13,13 +14,30 @@ const SECTIONS = [
 export default function ResultsContainer() {
   const { state } = useAppContext();
   const results = state.scanResults;
+  const [search, setSearch] = useState('');
 
   if (!results) return null;
 
+  const q = search.toLowerCase();
+
+  const filteredErrors = results.errors.filter(
+    err => !q || err.name.toLowerCase().includes(q),
+  );
+
   return (
     <div>
+      <input
+        type="text"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="Filter mods by name…"
+        className="w-full mb-4 px-3 py-2 bg-surface border border-border rounded-lg text-foreground placeholder:text-muted outline-none focus:border-accent"
+      />
+
       {SECTIONS.map(({ key, title, cssClass, showActions }) => {
-        const items = results[key] || [];
+        const items = (results[key] || []).filter(
+          item => !q || item.name.toLowerCase().includes(q),
+        );
         if (items.length === 0) return null;
         return (
           <ResultSection
@@ -32,11 +50,11 @@ export default function ResultsContainer() {
         );
       })}
 
-      {results.errors.length > 0 && (
+      {filteredErrors.length > 0 && (
         <div className="mt-8 p-4 bg-surface border border-border rounded-lg">
-          <h3 className="text-muted mb-2">API Errors ({results.errors.length})</h3>
+          <h3 className="text-muted mb-2">API Errors ({filteredErrors.length})</h3>
           <ul className="pl-6 text-muted text-[0.85rem]">
-            {results.errors.map(err => (
+            {filteredErrors.map(err => (
               <li key={err.addonID}>
                 <strong>{err.name}</strong> (ID {err.addonID}): {err.error}
               </li>
