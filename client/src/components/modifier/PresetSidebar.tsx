@@ -56,7 +56,7 @@ export default function PresetSidebar({ presets, selectedId, onSelect, onCreate,
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}
-                className="opacity-0 group-hover:opacity-100 text-danger text-[0.8rem] hover:text-danger cursor-pointer ml-2 shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-danger hover:text-danger cursor-pointer ml-2 shrink-0"
                 title="Delete preset"
               >
                 &times;
