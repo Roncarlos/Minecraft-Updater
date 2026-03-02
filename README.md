@@ -263,8 +263,9 @@ minecraft-mod-updater/
 │   │   ├── utils/         # Dependency graph helpers, severity rules
 │   │   └── components/    # layout/, results/, modals/, ui/
 │   └── dist/              # Production build (served by Express)
-├── commands/
-│   └── modpack-report.md  # /modpack-report slash command for Claude Code
+├── .claude/
+│   └── commands/
+│       └── modpack-report.md  # /modpack-report slash command for Claude Code
 ├── docs/
 │   └── images/            # Screenshots for documentation
 ├── downloads/             # Staged mod downloads (auto-created)
@@ -336,13 +337,8 @@ You can ask [Claude Code](https://docs.anthropic.com/en/docs/claude-code) to ana
 ### Setup
 
 1. Install Claude Code if you haven't already
-2. Copy the included command into your project's `.claude/commands/` directory:
-   ```bash
-   mkdir -p .claude/commands
-   cp commands/modpack-report.md .claude/commands/
-   ```
-   (`.claude/` is gitignored, so this is a local-only setup step)
-3. Make sure the mod updater is running (`npm run dev` or `npm start`) and you've completed a scan
+2. The slash command is included at `.claude/commands/modpack-report.md` — no setup needed
+3. Make sure the mod updater is running (`npm run dev` or `npm start`)
 4. Open Claude Code in the project directory
 
 ### Usage
@@ -353,7 +349,13 @@ Run the slash command:
 /modpack-report
 ```
 
-Claude will fetch the scan report from `GET /api/report`, analyze every flagged mod, and produce a concrete update plan: what to skip, what needs config adjustments, and what's safe to bulk-update.
+Or specify an instance name:
+
+```
+/modpack-report ATM10
+```
+
+Claude will automatically check the server, select the instance, run a scan if needed, fetch the report, and produce a concrete update plan: what to skip, what needs config adjustments, and what's safe to bulk-update.
 
 You can also fetch the report manually for use with any LLM:
 

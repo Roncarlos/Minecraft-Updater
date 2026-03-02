@@ -3,7 +3,8 @@ downloads/
 backups/
 ModUpdateCache.json
 ModUpdateReport.html
-.claude/
+.claude/*
+!.claude/commands/
 settings.json
 client/dist/
 client/node_modules/
