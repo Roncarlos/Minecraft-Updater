@@ -79,6 +79,9 @@ export const testLlmConnection = () =>
 export const detectConcurrency = () =>
   get<{ success: boolean; instances?: number; models?: string[]; error?: string }>('/api/settings/detect-concurrency');
 
+export const fetchModels = () =>
+  get<{ success: boolean; models?: string[]; error?: string }>('/api/settings/models');
+
 // ── LLM health ────────────────────────────────────────────────────────────
 
 type LlmHealthResponse =

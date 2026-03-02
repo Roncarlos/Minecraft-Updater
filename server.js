@@ -387,6 +387,57 @@ app.post('/api/settings', async (req, res) => {
   }
 });
 
+// ── GET /api/settings/models ───────────────────────────────────────────────
+app.get('/api/settings/models', async (req, res) => {
+  try {
+    const settings = await loadSettings();
+    const { endpoint, apiKey } = settings.llm;
+    if (!endpoint) {
+      res.json({ success: false, error: 'LLM endpoint not configured' });
+      return;
+    }
+
+    const base = endpoint.replace(/\/+$/, '');
+    const headers = {};
+    if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const resp = await fetch(`${base}/models`, { headers, signal: controller.signal });
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        res.json({ success: false, error: `HTTP ${resp.status}: ${errText.slice(0, 200)}` });
+        return;
+      }
+
+      const body = await resp.json();
+      const allModels = body.data || [];
+
+      // Deduplicate by stripping :N instance suffixes
+      const seen = new Set();
+      const models = [];
+      for (const m of allModels) {
+        const id = (m.id || '').replace(/:\d+$/, '');
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          models.push(id);
+        }
+      }
+
+      res.json({ success: true, models });
+    } catch (fetchErr) {
+      res.json({ success: false, error: fetchErr.message });
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /api/settings/test-llm ────────────────────────────────────────────
 app.post('/api/settings/test-llm', async (req, res) => {
   try {

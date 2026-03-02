@@ -5,6 +5,7 @@ import {
   saveSettings as apiSaveSettings,
   testLlmConnection,
   detectConcurrency,
+  fetchModels,
 } from '../api/endpoints';
 import { isLlmConfigured } from '../utils/llmConfigured';
 import type { Settings } from '../types';
@@ -33,5 +34,6 @@ export function useSettings() {
     saveSettings: saveAndReload,
     testLlm: testLlmConnection,
     detectConcurrency,
+    fetchModels,
   };
 }

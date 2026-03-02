@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useSettings } from '../../hooks/useSettings';
 import { useAppContext } from '../../context';
@@ -8,16 +8,19 @@ import type { Settings } from '../../types';
 
 export default function SettingsModal() {
   const { state, closeModal } = useAppContext();
-  const { saveSettings, testLlm, detectConcurrency } = useSettings();
+  const { saveSettings, testLlm, detectConcurrency, fetchModels } = useSettings();
   const [testResult, setTestResult] = useState<{ text: string; color: string } | null>(null);
   const [detectResult, setDetectResult] = useState<{ text: string; color: string } | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
 
   const llm = state.settings?.llm;
   const cache = state.settings?.cache;
 
-  const { register, handleSubmit, setValue, getValues } = useForm<Settings>({
+  const { register, handleSubmit, setValue, getValues, watch } = useForm<Settings>({
     defaultValues: {
       llm: {
         enabled: llm?.enabled ?? false,
@@ -94,6 +97,31 @@ export default function SettingsModal() {
     }
   };
 
+  const currentModel = watch('llm.model');
+
+  const loadModels = async () => {
+    setModelsLoading(true);
+    setModelsError(null);
+    try {
+      const data = await fetchModels();
+      if (data.success && data.models) {
+        setModels(data.models);
+      } else {
+        setModelsError(data.error || 'Failed to fetch models');
+      }
+    } catch (err) {
+      setModelsError(err instanceof Error ? err.message : 'Failed to fetch models');
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+
+  // Fetch models once on mount when an endpoint is already configured
+  const initialEndpoint = llm?.endpoint;
+  useEffect(() => {
+    if (initialEndpoint) loadModels();
+  }, [initialEndpoint]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fieldClass = "flex-1 bg-bg border border-border text-text px-2.5 py-1.5 rounded text-[0.85rem] font-[inherit] focus:outline-none focus:border-info";
 
   return (
@@ -142,8 +170,23 @@ export default function SettingsModal() {
 
           <div className="flex items-center gap-3 mb-2.5">
             <label className="min-w-[100px] text-muted text-[0.85rem] shrink-0">Model</label>
-            <input type="text" {...register('llm.model')} placeholder="Model name" className={fieldClass} />
+            <select {...register('llm.model')} className={fieldClass} disabled={!!modelsError && models.length === 0}>
+              <option value="">Select a model</option>
+              {currentModel && !models.includes(currentModel) && (
+                <option value={currentModel}>{currentModel}</option>
+              )}
+              {models.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <Button variant="download" size="sm" onClick={loadModels} disabled={modelsLoading}>
+              {modelsLoading ? 'Loading…' : 'Refresh'}
+            </Button>
           </div>
+          {modelsError && (
+            <div className="flex items-center gap-3 mb-2.5">
+              <label className="min-w-[100px] shrink-0" />
+              <span className="text-danger text-[0.8rem]">{modelsError}</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 mb-2.5">
             <label className="min-w-[100px] text-muted text-[0.85rem] shrink-0">Max Tokens</label>
