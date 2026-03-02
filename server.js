@@ -11,7 +11,7 @@ import { buildReport } from './lib/report.js';
 import {
   listPresets, createPreset, getPreset, updatePreset, deletePreset,
   addModToPreset, removeModFromPreset,
-  listConfigs, importConfigsFromFolder, uploadConfig, readConfig, saveConfig, deleteConfig,
+  listConfigs, importConfigsFromFolder, uploadConfig, readConfig, resolveConfigPath, saveConfig, deleteConfig,
   downloadPresetMods, applyPreset as applyPresetToInstance,
 } from './lib/modifier.js';
 import { searchMods, getModFiles, LOADER_MAP } from './lib/curseforge.js';
@@ -23,8 +23,12 @@ const app = express();
 const wrapAsync = (fn) => (req, res, next) =>
   Promise.resolve(fn(req, res, next)).catch(next);
 
+const isDev = process.argv.includes('--dev');
+
 app.use(express.json());
-app.use(express.static(join(__dirname, 'client', 'dist')));
+if (!isDev) {
+  app.use(express.static(join(__dirname, 'client', 'dist')));
+}
 
 // ── State ──────────────────────────────────────────────────────────────────
 let selectedInstancePath = null;
@@ -662,22 +666,64 @@ app.get('/api/modifier/presets/:id/configs', wrapAsync(async (req, res) => {
 }));
 
 app.get('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath;
+  const targetPath = req.params.configPath.join('/');
   const content = await readConfig(req.params.id, targetPath);
   res.json({ targetPath, content });
 }));
 
 app.put('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath;
+  const targetPath = req.params.configPath.join('/');
   const { content } = req.body;
   const entry = await saveConfig(req.params.id, targetPath, content || '');
   res.json(entry);
 }));
 
 app.delete('/api/modifier/presets/:id/configs/{*configPath}', wrapAsync(async (req, res) => {
-  const targetPath = req.params.configPath;
+  const targetPath = req.params.configPath.join('/');
   await deleteConfig(req.params.id, targetPath);
   res.json({ success: true });
+}));
+
+app.post('/api/modifier/presets/:id/configs/open', wrapAsync(async (req, res) => {
+  const { targetPath } = req.body;
+  if (!targetPath) { res.status(400).json({ error: 'Missing targetPath' }); return; }
+  const absPath = resolveConfigPath(req.params.id, targetPath);
+
+  try {
+    await access(absPath);
+  } catch {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const hasVSCode = await checkVSCode();
+  let bin, args;
+
+  if (hasVSCode) {
+    bin = 'code';
+    args = ['--goto', `"${absPath}:1"`];
+  } else {
+    const platform = process.platform;
+    if (platform === 'win32') {
+      bin = 'cmd';
+      args = ['/c', 'start', '""', absPath];
+    } else if (platform === 'darwin') {
+      bin = 'open';
+      args = [absPath];
+    } else {
+      bin = 'xdg-open';
+      args = [absPath];
+    }
+  }
+
+  const opts = hasVSCode && process.platform === 'win32' ? { shell: true } : {};
+  execFile(bin, args, opts, (err) => {
+    if (err) {
+      res.status(500).json({ error: `Failed to open file: ${err.message}` });
+      return;
+    }
+    res.json({ success: true });
+  });
 }));
 
 // ── Modifier: Download + Apply ────────────────────────────────────────────
@@ -702,7 +748,11 @@ app.use((err, req, res, _next) => {
 
 // SPA fallback — must come after all /api routes
 app.get('/{*path}', (req, res) => {
-  res.sendFile(join(__dirname, 'client', 'dist', 'index.html'));
+  if (isDev) {
+    res.redirect('http://localhost:5173');
+  } else {
+    res.sendFile(join(__dirname, 'client', 'dist', 'index.html'));
+  }
 });
 
 // ── Start ──────────────────────────────────────────────────────────────────

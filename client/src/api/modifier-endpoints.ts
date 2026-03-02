@@ -63,6 +63,9 @@ export const saveConfigContent = (presetId: string, targetPath: string, content:
 export const deleteConfigFile = (presetId: string, targetPath: string) =>
   del<{ success: boolean }>(`/api/modifier/presets/${presetId}/configs/${targetPath}`);
 
+export const openConfigFile = (presetId: string, targetPath: string) =>
+  post<{ success: boolean }>(`/api/modifier/presets/${presetId}/configs/open`, { targetPath });
+
 // ── Download + Apply ──────────────────────────────────────────────────────
 
 export const downloadPresetMods = (presetId: string) =>

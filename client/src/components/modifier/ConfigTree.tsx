@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useConfigs } from '../../hooks/useConfigs';
-import { saveConfigContent } from '../../api/modifier-endpoints';
+import { saveConfigContent, openConfigFile } from '../../api/modifier-endpoints';
 import { formatBytes } from '../../utils/format';
 import type { PresetConfigEntry, ModalState } from '../../types';
 
@@ -44,8 +44,13 @@ function buildTree(configs: PresetConfigEntry[]): TreeNode[] {
   return root;
 }
 
-function TreeItem({ node, depth, onEdit, onDelete }: { node: TreeNode; depth: number; onEdit: (path: string) => void; onDelete: (path: string) => void }) {
+function TreeItem({ node, depth, onOpen, onEdit, onDelete, busyPath, busyAction }: {
+  node: TreeNode; depth: number;
+  onOpen: (path: string) => void; onEdit: (path: string) => void; onDelete: (path: string) => void;
+  busyPath: string | null; busyAction: 'open' | 'edit' | 'delete' | null;
+}) {
   const [expanded, setExpanded] = useState(depth < 2);
+  const isBusy = busyPath === node.fullPath;
 
   if (node.isDir) {
     return (
@@ -59,7 +64,7 @@ function TreeItem({ node, depth, onEdit, onDelete }: { node: TreeNode; depth: nu
           <span>{node.name}/</span>
         </div>
         {expanded && node.children.map(child => (
-          <TreeItem key={child.fullPath} node={child} depth={depth + 1} onEdit={onEdit} onDelete={onDelete} />
+          <TreeItem key={child.fullPath} node={child} depth={depth + 1} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} busyPath={busyPath} busyAction={busyAction} />
         ))}
       </div>
     );
@@ -67,16 +72,23 @@ function TreeItem({ node, depth, onEdit, onDelete }: { node: TreeNode; depth: nu
 
   return (
     <div
-      className="flex items-center gap-2 py-0.5 group text-[0.83rem]"
+      className={`flex items-center gap-2 py-0.5 group text-[0.83rem] ${isBusy ? 'opacity-50' : ''}`}
       style={{ paddingLeft: depth * 16 }}
     >
       <span className="text-text">{node.name}</span>
       {node.sizeBytes !== undefined && (
         <span className="text-[0.75rem] text-muted">{formatBytes(node.sizeBytes)}</span>
       )}
-      <div className="ml-auto opacity-0 group-hover:opacity-100 flex gap-2 transition-opacity">
-        <button onClick={() => onEdit(node.fullPath)} className="text-info text-[0.75rem] cursor-pointer hover:underline">Edit</button>
-        <button onClick={() => onDelete(node.fullPath)} className="text-danger text-[0.75rem] cursor-pointer hover:underline">Delete</button>
+      <div className={`ml-auto flex gap-2 transition-opacity ${isBusy ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+        {isBusy ? (
+          <span className="text-muted text-[0.75rem]">{busyAction === 'delete' ? 'Deleting...' : busyAction === 'open' ? 'Opening...' : 'Loading...'}</span>
+        ) : (
+          <>
+            <button onClick={() => onOpen(node.fullPath)} disabled={!!busyPath} className="text-success text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Open</button>
+            <button onClick={() => onEdit(node.fullPath)} disabled={!!busyPath} className="text-info text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Edit</button>
+            <button onClick={() => onDelete(node.fullPath)} disabled={!!busyPath} className="text-danger text-[0.75rem] cursor-pointer hover:underline disabled:opacity-40 disabled:cursor-default">Delete</button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -84,8 +96,25 @@ function TreeItem({ node, depth, onEdit, onDelete }: { node: TreeNode; depth: nu
 
 export default function ConfigTree({ presetId, configs, onRefresh, openModal }: ConfigTreeProps) {
   const { readFile, deleteFile } = useConfigs(presetId);
+  const [busyPath, setBusyPath] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<'open' | 'edit' | 'delete' | null>(null);
+
+  const handleOpen = async (targetPath: string) => {
+    setBusyPath(targetPath);
+    setBusyAction('open');
+    try {
+      await openConfigFile(presetId, targetPath);
+    } catch {
+      // ignore — file may not have an associated editor
+    } finally {
+      setBusyPath(null);
+      setBusyAction(null);
+    }
+  };
 
   const handleEdit = async (targetPath: string) => {
+    setBusyPath(targetPath);
+    setBusyAction('edit');
     try {
       const content = await readFile(targetPath);
       openModal({
@@ -100,11 +129,21 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
       });
     } catch {
       // ignore
+    } finally {
+      setBusyPath(null);
+      setBusyAction(null);
     }
   };
 
   const handleDelete = async (targetPath: string) => {
-    await deleteFile(targetPath, onRefresh);
+    setBusyPath(targetPath);
+    setBusyAction('delete');
+    try {
+      await deleteFile(targetPath, onRefresh);
+    } finally {
+      setBusyPath(null);
+      setBusyAction(null);
+    }
   };
 
   if (configs.length === 0) {
@@ -116,7 +155,7 @@ export default function ConfigTree({ presetId, configs, onRefresh, openModal }: 
   return (
     <div className="bg-bg rounded-lg p-3 mt-2">
       {tree.map(node => (
-        <TreeItem key={node.fullPath} node={node} depth={0} onEdit={handleEdit} onDelete={handleDelete} />
+        <TreeItem key={node.fullPath} node={node} depth={0} onOpen={handleOpen} onEdit={handleEdit} onDelete={handleDelete} busyPath={busyPath} busyAction={busyAction} />
       ))}
     </div>
   );
