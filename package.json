@@ -5,7 +5,7 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "concurrently \"node server.js\" \"cd client && npx vite\"",
+    "dev": "concurrently \"node server.js --dev\" \"cd client && npx vite\"",
     "build": "cd client && npm run build",
     "start": "node server.js"
   },
