@@ -3,8 +3,10 @@ import Button from '../ui/Button';
 import { useResourcepacks } from '../../hooks/useResourcepacks';
 import { openResourcepackFile } from '../../api/modifier-endpoints';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useFilteredList } from '../../hooks/useFilteredList';
 import { useBrowse } from '../../hooks/useBrowse';
 import { formatBytes } from '../../utils/format';
+import FilterInput from '../ui/FilterInput';
 import type { PresetConfigEntry } from '../../types';
 
 interface ResourcepackManagerProps {
@@ -62,6 +64,7 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
   };
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const { search, setSearch, filtered, showFilter } = useFilteredList(resourcepacks, p => [p.targetPath]);
 
   const handleOpen = async (targetPath: string) => {
     setBusyPath(targetPath);
@@ -164,7 +167,10 @@ export default function ResourcepackManager({ presetId, resourcepacks, onRefresh
         <div className="text-muted text-[0.8rem] py-2">No resource packs. Use import or upload above.</div>
       ) : (
         <div className="bg-bg rounded-lg p-3">
-          {resourcepacks.map(pack => {
+          {showFilter && <FilterInput value={search} onChange={setSearch} placeholder="Filter resource packs..." />}
+          {filtered.length === 0 ? (
+            <div className="text-muted text-[0.8rem] py-1">No matches.</div>
+          ) : filtered.map(pack => {
             const isBusy = busyPath === pack.targetPath;
             return (
               <div

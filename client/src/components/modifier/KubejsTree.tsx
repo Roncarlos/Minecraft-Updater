@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useKubejs } from '../../hooks/useKubejs';
 import { saveKubejsContent, openKubejsFile } from '../../api/modifier-endpoints';
 import { useConfirm } from '../../hooks/useConfirm';
+import { useFilteredList } from '../../hooks/useFilteredList';
 import { buildTree } from '../../utils/buildTree';
 import FileTreeItem from './FileTreeItem';
+import FilterInput from '../ui/FilterInput';
 import type { PresetConfigEntry, ModalState } from '../../types';
 
 interface KubejsTreeProps {
@@ -19,6 +21,7 @@ export default function KubejsTree({ presetId, kubejs, onRefresh, openModal }: K
   const [busyAction, setBusyAction] = useState<'open' | 'edit' | 'delete' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const confirm = useConfirm();
+  const { search, setSearch, filtered, showFilter } = useFilteredList(kubejs, k => [k.targetPath]);
 
   const handleOpen = async (targetPath: string) => {
     setBusyPath(targetPath);
@@ -80,14 +83,19 @@ export default function KubejsTree({ presetId, kubejs, onRefresh, openModal }: K
     return <div className="text-muted text-[0.8rem] py-2">No KubeJS files. Use import or upload above.</div>;
   }
 
-  const tree = buildTree(kubejs);
+  const tree = buildTree(filtered);
 
   return (
     <div className="bg-bg rounded-lg p-3 mt-2">
       {error && <div className="text-danger text-[0.8rem] mb-2">{error}</div>}
-      {tree.map(node => (
-        <FileTreeItem key={node.fullPath} node={node} depth={0} onOpen={handleOpen} onEdit={handleEdit} onDelete={handleDelete} busyPath={busyPath} busyAction={busyAction} canEdit />
-      ))}
+      {showFilter && <FilterInput value={search} onChange={setSearch} placeholder="Filter KubeJS files..." />}
+      {filtered.length === 0 ? (
+        <div className="text-muted text-[0.8rem] py-1">No matches.</div>
+      ) : (
+        tree.map(node => (
+          <FileTreeItem key={node.fullPath} node={node} depth={0} onOpen={handleOpen} onEdit={handleEdit} onDelete={handleDelete} busyPath={busyPath} busyAction={busyAction} canEdit />
+        ))
+      )}
     </div>
   );
 }
