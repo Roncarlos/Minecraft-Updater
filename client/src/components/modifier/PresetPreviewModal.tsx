@@ -43,12 +43,14 @@ export default function PresetPreviewModal({ preview, onConfirmApply }: PresetPr
   const { closeModal } = useAppContext();
 
   const disabledMods = preview.disabledMods ?? [];
+  const fileReplacements = preview.fileReplacements ?? [];
   const totalFiles =
     preview.mods.length +
     preview.configs.length +
     preview.kubejs.length +
     preview.resourcepacks.length +
-    disabledMods.length;
+    disabledMods.length +
+    fileReplacements.length;
 
   const handleConfirm = () => {
     closeModal();
@@ -82,6 +84,27 @@ export default function PresetPreviewModal({ preview, onConfirmApply }: PresetPr
                     <span className="text-danger">disable</span>
                     <span className="text-muted">{item.fileName}</span>
                     <span className="text-muted text-[0.75rem]">(/{item.pattern}/)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {fileReplacements.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">
+                  File Replacements ({fileReplacements.length})
+                </h4>
+                {fileReplacements.map((item, i) => (
+                  <div key={`${item.targetPath}-${i}`} className="text-[0.8rem] mt-0.5 flex items-baseline gap-1.5">
+                    <span className={item.error ? 'text-danger' : item.fileExists ? 'text-warning' : 'text-danger'}>
+                      {item.error ? 'error' : item.fileExists ? 'replace' : 'missing'}
+                    </span>
+                    <span className="text-muted">{item.targetPath}</span>
+                    {item.error
+                      ? <span className="text-danger text-[0.75rem]">{item.error}</span>
+                      : <span className="text-muted text-[0.75rem]">
+                          ({item.replacementCount} pattern{item.replacementCount !== 1 ? 's' : ''}, {item.totalMatches} match{item.totalMatches !== 1 ? 'es' : ''})
+                        </span>
+                    }
                   </div>
                 ))}
               </div>

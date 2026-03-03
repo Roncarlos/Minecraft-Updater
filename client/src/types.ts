@@ -166,6 +166,7 @@ export interface PresetSummary {
   kubejsCount: number;
   resourcepackCount: number;
   disableModCount: number;
+  fileReplacementCount: number;
   createdAt: string;
 }
 
@@ -184,6 +185,17 @@ export interface PresetConfigEntry {
   isText?: boolean;
 }
 
+export interface FileReplacement {
+  pattern: string;
+  replacement: string;
+  flags?: string;
+}
+
+export interface FileReplacementRule {
+  targetPath: string;
+  replacements: FileReplacement[];
+}
+
 export interface Preset {
   id: string;
   name: string;
@@ -196,6 +208,7 @@ export interface Preset {
   kubejs: PresetConfigEntry[];
   resourcepacks: PresetConfigEntry[];
   disableMods: string[];
+  fileReplacements: FileReplacementRule[];
 }
 
 export interface CfSearchResult {
@@ -240,6 +253,13 @@ export interface ApplyCategoryResult {
   error?: string;
 }
 
+export interface ApplyFileReplacementResult {
+  targetPath: string;
+  matchCount: number;
+  success: boolean;
+  error?: string;
+}
+
 export interface ApplyPresetResult {
   presetName: string;
   instanceName: string;
@@ -248,6 +268,7 @@ export interface ApplyPresetResult {
   kubejs: ApplyCategoryResult[];
   resourcepacks: ApplyCategoryResult[];
   disabledMods: { fileName: string; success: boolean; error?: string }[];
+  fileReplacements: ApplyFileReplacementResult[];
   errors: string[];
 }
 
@@ -268,6 +289,14 @@ export interface PreviewCategoryEntry {
   action: 'add' | 'overwrite';
 }
 
+export interface PreviewFileReplacementEntry {
+  targetPath: string;
+  replacementCount: number;
+  totalMatches: number;
+  fileExists: boolean;
+  error?: string;
+}
+
 export interface PresetPreviewResult {
   presetName: string;
   instanceName: string;
@@ -276,6 +305,7 @@ export interface PresetPreviewResult {
   kubejs: PreviewCategoryEntry[];
   resourcepacks: PreviewCategoryEntry[];
   disabledMods: { fileName: string; pattern: string }[];
+  fileReplacements: PreviewFileReplacementEntry[];
 }
 
 export interface RollbackResult {

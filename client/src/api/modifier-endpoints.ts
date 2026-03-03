@@ -23,7 +23,7 @@ export const createPreset = (name: string, mcVersion?: string, loader?: string) 
 export const fetchPreset = (id: string) =>
   get<Preset>(`/api/modifier/presets/${id}`);
 
-export const updatePreset = (id: string, updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader' | 'disableMods'>>) =>
+export const updatePreset = (id: string, updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader' | 'disableMods' | 'fileReplacements'>>) =>
   patch<Preset>(`/api/modifier/presets/${id}`, updates);
 
 export const deletePreset = (id: string) =>

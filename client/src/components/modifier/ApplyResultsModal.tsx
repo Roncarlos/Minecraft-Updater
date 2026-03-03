@@ -21,6 +21,10 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
   const disabledMods = result.disabledMods ?? [];
   const disableSuccessCount = disabledMods.filter(d => d.success).length;
   const disableFailCount = disabledMods.filter(d => !d.success).length;
+  const fileReplacements = result.fileReplacements ?? [];
+  const frSuccessCount = fileReplacements.filter(f => f.success).length;
+  const frFailCount = fileReplacements.filter(f => !f.success).length;
+  const frTotalMatches = fileReplacements.reduce((sum, f) => sum + f.matchCount, 0);
 
   const hasErrors = result.errors.length > 0;
 
@@ -109,6 +113,27 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
             {disabledMods.filter(d => !d.success).map(d => (
               <div key={d.fileName} className="text-danger text-[0.8rem] mt-1">
                 {d.fileName}: {d.error}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* File Replacement results */}
+        {fileReplacements.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">File Replacements</h4>
+            <div className="text-[0.85rem]">
+              <span className="text-success">{frSuccessCount} processed ({frTotalMatches} match{frTotalMatches !== 1 ? 'es' : ''})</span>
+              {frFailCount > 0 && <span className="text-danger ml-3">{frFailCount} failed</span>}
+            </div>
+            {fileReplacements.filter(f => f.success).map(f => (
+              <div key={f.targetPath} className="text-[0.8rem] text-muted mt-0.5">
+                {f.targetPath}: <span className="text-success">{f.matchCount} match{f.matchCount !== 1 ? 'es' : ''}</span>
+              </div>
+            ))}
+            {fileReplacements.filter(f => !f.success).map(f => (
+              <div key={f.targetPath} className="text-danger text-[0.8rem] mt-1">
+                {f.targetPath}: {f.error}
               </div>
             ))}
           </div>
