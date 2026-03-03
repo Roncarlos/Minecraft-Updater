@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "concurrently \"node server.js --dev\" \"cd client && npx vite\"",
     "build": "cd client && npm run build",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test lib/**/*.test.js"
   },
   "dependencies": {
     "express": "^5.1.0",
