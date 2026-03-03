@@ -36,17 +36,19 @@ function PreviewSection({ title, items, actionColors }: PreviewSectionProps) {
   );
 }
 
-const MOD_COLORS: Record<string, string> = { add: 'text-info', overwrite: 'text-warning' };
+const MOD_COLORS: Record<string, string> = { add: 'text-info', overwrite: 'text-warning', disable: 'text-danger' };
 const CONFIG_COLORS: Record<string, string> = { created: 'text-info', merged: 'text-success', replaced: 'text-warning' };
 
 export default function PresetPreviewModal({ preview, onConfirmApply }: PresetPreviewModalProps) {
   const { closeModal } = useAppContext();
 
+  const disabledMods = preview.disabledMods ?? [];
   const totalFiles =
     preview.mods.length +
     preview.configs.length +
     preview.kubejs.length +
-    preview.resourcepacks.length;
+    preview.resourcepacks.length +
+    disabledMods.length;
 
   const handleConfirm = () => {
     closeModal();
@@ -70,6 +72,20 @@ export default function PresetPreviewModal({ preview, onConfirmApply }: PresetPr
             <PreviewSection title="Configs" items={preview.configs} actionColors={CONFIG_COLORS} />
             <PreviewSection title="KubeJS" items={preview.kubejs} actionColors={MOD_COLORS} />
             <PreviewSection title="Resource Packs" items={preview.resourcepacks} actionColors={MOD_COLORS} />
+            {disabledMods.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">
+                  Disabled Mods ({disabledMods.length})
+                </h4>
+                {disabledMods.map((item, i) => (
+                  <div key={`${item.fileName}-${i}`} className="text-[0.8rem] mt-0.5 flex items-baseline gap-1.5">
+                    <span className="text-danger">disable</span>
+                    <span className="text-muted">{item.fileName}</span>
+                    <span className="text-muted text-[0.75rem]">(/{item.pattern}/)</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>

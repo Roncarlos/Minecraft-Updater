@@ -60,13 +60,14 @@ export function usePresets() {
       configCount: 0,
       kubejsCount: 0,
       resourcepackCount: 0,
+      disableModCount: 0,
       createdAt: preset.createdAt,
     }]);
     setSelected(preset);
     setSelectedId(preset.id);
   }, []);
 
-  const update = useCallback(async (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader'>>) => {
+  const update = useCallback(async (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader' | 'disableMods'>>) => {
     if (!selectedId) return;
     const updated = await api.updatePreset(selectedId, updates);
     setSelected(updated);
@@ -79,6 +80,7 @@ export function usePresets() {
       configCount: updated.configs.length,
       kubejsCount: updated.kubejs.length,
       resourcepackCount: updated.resourcepacks.length,
+      disableModCount: updated.disableMods.length,
     } : p));
   }, [selectedId]);
 
@@ -102,6 +104,7 @@ export function usePresets() {
         configCount: preset.configs.length,
         kubejsCount: preset.kubejs.length,
         resourcepackCount: preset.resourcepacks.length,
+        disableModCount: preset.disableMods.length,
       } : p));
     } catch (err) { console.warn('Failed to refresh preset:', err); }
   }, [selectedId]);
@@ -117,6 +120,7 @@ export function usePresets() {
         configCount: preset.configs.length,
         kubejsCount: preset.kubejs.length,
         resourcepackCount: preset.resourcepacks.length,
+        disableModCount: preset.disableMods.length,
       } : p));
     } catch (err) { console.warn('Failed to refresh preset files:', err); }
   }, [selectedId]);

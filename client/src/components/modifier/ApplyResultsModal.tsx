@@ -18,6 +18,9 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
   const kubejsFailCount = result.kubejs.filter(k => !k.success).length;
   const rpSuccessCount = result.resourcepacks.filter(r => r.success).length;
   const rpFailCount = result.resourcepacks.filter(r => !r.success).length;
+  const disabledMods = result.disabledMods ?? [];
+  const disableSuccessCount = disabledMods.filter(d => d.success).length;
+  const disableFailCount = disabledMods.filter(d => !d.success).length;
 
   const hasErrors = result.errors.length > 0;
 
@@ -90,6 +93,22 @@ export default function ApplyResultsModal({ result }: ApplyResultsModalProps) {
             {result.resourcepacks.filter(r => !r.success).map(r => (
               <div key={r.targetPath} className="text-danger text-[0.8rem] mt-1">
                 {r.targetPath}: {r.error}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Disabled Mods results */}
+        {disabledMods.length > 0 && (
+          <div className="mb-4">
+            <h4 className="text-info text-[0.85rem] uppercase tracking-wide mb-2">Disabled Mods</h4>
+            <div className="text-[0.85rem]">
+              <span className="text-success">{disableSuccessCount} disabled</span>
+              {disableFailCount > 0 && <span className="text-danger ml-3">{disableFailCount} failed</span>}
+            </div>
+            {disabledMods.filter(d => !d.success).map(d => (
+              <div key={d.fileName} className="text-danger text-[0.8rem] mt-1">
+                {d.fileName}: {d.error}
               </div>
             ))}
           </div>

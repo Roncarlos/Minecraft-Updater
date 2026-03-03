@@ -63,6 +63,7 @@ export default function PresetSidebar({ presets, selectedId, onSelect, onCreate,
                   {p.modCount} mods &middot; {p.configCount} configs
                   {p.kubejsCount > 0 && <> &middot; {p.kubejsCount} kubejs</>}
                   {p.resourcepackCount > 0 && <> &middot; {p.resourcepackCount} packs</>}
+                  {p.disableModCount > 0 && <> &middot; {p.disableModCount} disabled</>}
                 </div>
               </div>
               <button

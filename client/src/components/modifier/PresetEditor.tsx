@@ -7,13 +7,14 @@ import ConfigTree from './ConfigTree';
 import KubejsManager from './KubejsManager';
 import KubejsTree from './KubejsTree';
 import ResourcepackManager from './ResourcepackManager';
+import DisableModsEditor from './DisableModsEditor';
 import ApplyPanel from './ApplyPanel';
 import type { Preset, Instance, ModalState } from '../../types';
 
 interface PresetEditorProps {
   preset: Preset;
   instances: Instance[];
-  onUpdate: (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader'>>) => Promise<void>;
+  onUpdate: (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader' | 'disableMods'>>) => Promise<void>;
   onRefresh: () => Promise<void>;
   onRefreshFiles: () => Promise<void>;
   openModal: (m: ModalState) => void;
@@ -152,6 +153,14 @@ export default function PresetEditor({ preset, instances, onUpdate, onRefresh, o
               Resource Packs ({preset.resourcepacks.length})
             </h3>
             <ResourcepackManager presetId={preset.id} resourcepacks={preset.resourcepacks} onRefresh={onRefresh} />
+          </div>
+
+          {/* Disable Mods Section */}
+          <div>
+            <h3 className="text-info text-[0.9rem] uppercase tracking-wide mb-3 pb-1.5 border-b border-border">
+              Disable Mods ({(preset.disableMods ?? []).length} pattern{(preset.disableMods ?? []).length !== 1 ? 's' : ''})
+            </h3>
+            <DisableModsEditor presetId={preset.id} patterns={preset.disableMods ?? []} onUpdate={onUpdate} />
           </div>
 
           {/* Apply Section */}

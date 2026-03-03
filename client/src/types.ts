@@ -165,6 +165,7 @@ export interface PresetSummary {
   configCount: number;
   kubejsCount: number;
   resourcepackCount: number;
+  disableModCount: number;
   createdAt: string;
 }
 
@@ -194,6 +195,7 @@ export interface Preset {
   configs: PresetConfigEntry[];
   kubejs: PresetConfigEntry[];
   resourcepacks: PresetConfigEntry[];
+  disableMods: string[];
 }
 
 export interface CfSearchResult {
@@ -245,6 +247,7 @@ export interface ApplyPresetResult {
   configs: ApplyConfigResult[];
   kubejs: ApplyCategoryResult[];
   resourcepacks: ApplyCategoryResult[];
+  disabledMods: { fileName: string; success: boolean; error?: string }[];
   errors: string[];
 }
 
@@ -272,6 +275,7 @@ export interface PresetPreviewResult {
   configs: PreviewConfigEntry[];
   kubejs: PreviewCategoryEntry[];
   resourcepacks: PreviewCategoryEntry[];
+  disabledMods: { fileName: string; pattern: string }[];
 }
 
 export interface RollbackResult {
@@ -282,6 +286,7 @@ export interface RollbackResult {
   kubejs: number;
   resourcepacks: number;
   removed: number;
+  reEnabled: number;
   errors: string[];
 }
 
