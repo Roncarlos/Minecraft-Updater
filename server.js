@@ -53,6 +53,7 @@ import {
   resolveResourcepackPath,
   downloadPresetMods,
   applyPreset as applyPresetToInstance,
+  previewPreset as previewPresetChanges,
   rollbackPreset,
   hasPresetBackup,
 } from "./lib/modifier.js";
@@ -1118,6 +1119,19 @@ app.post(
   wrapAsync(async (req, res) => {
     const results = await downloadPresetMods(req.params.id);
     res.json(results);
+  }),
+);
+
+app.post(
+  "/api/modifier/presets/:id/preview",
+  wrapAsync(async (req, res) => {
+    const { instanceName } = req.body;
+    if (!instanceName || typeof instanceName !== "string") {
+      res.status(400).json({ error: "Missing instanceName" });
+      return;
+    }
+    const result = await previewPresetChanges(req.params.id, instanceName);
+    res.json(result);
   }),
 );
 

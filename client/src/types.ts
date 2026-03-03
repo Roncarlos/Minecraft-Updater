@@ -151,7 +151,8 @@ export type ModalState =
   | { type: 'settings' }
   | { type: 'mod-file-picker'; addonId: number; modName: string; presetId: string; mcVersion: string; loader: string; onAdded: () => void }
   | { type: 'config-editor'; presetId: string; targetPath: string; content: string; onSave: (content: string) => Promise<void> }
-  | { type: 'apply-results'; result: ApplyPresetResult };
+  | { type: 'apply-results'; result: ApplyPresetResult }
+  | { type: 'preset-preview'; preview: PresetPreviewResult; onConfirmApply: () => void };
 
 // ── Modifier types ────────────────────────────────────────────────────────
 
@@ -245,6 +246,32 @@ export interface ApplyPresetResult {
   kubejs: ApplyCategoryResult[];
   resourcepacks: ApplyCategoryResult[];
   errors: string[];
+}
+
+export interface PreviewModEntry {
+  addonId: number;
+  fileName: string;
+  action: 'add' | 'overwrite';
+  downloaded: boolean;
+}
+
+export interface PreviewConfigEntry {
+  targetPath: string;
+  action: 'created' | 'merged' | 'replaced';
+}
+
+export interface PreviewCategoryEntry {
+  targetPath: string;
+  action: 'add' | 'overwrite';
+}
+
+export interface PresetPreviewResult {
+  presetName: string;
+  instanceName: string;
+  mods: PreviewModEntry[];
+  configs: PreviewConfigEntry[];
+  kubejs: PreviewCategoryEntry[];
+  resourcepacks: PreviewCategoryEntry[];
 }
 
 export interface RollbackResult {

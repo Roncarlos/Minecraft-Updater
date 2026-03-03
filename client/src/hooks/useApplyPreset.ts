@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { downloadPresetMods, applyPreset, rollbackPreset as rollbackPresetApi, hasPresetBackup } from '../api/modifier-endpoints';
+import { downloadPresetMods, applyPreset, previewPreset as previewPresetApi, rollbackPreset as rollbackPresetApi, hasPresetBackup } from '../api/modifier-endpoints';
 import type { ApplyModResult, ModalState, RollbackResult } from '../types';
 
 export function useApplyPreset() {
@@ -9,6 +9,7 @@ export function useApplyPreset() {
   const [error, setError] = useState<string | null>(null);
   const [rollingBack, setRollingBack] = useState(false);
   const [rollbackResult, setRollbackResult] = useState<RollbackResult | null>(null);
+  const [previewing, setPreviewing] = useState(false);
   const [hasBackup, setHasBackup] = useState(false);
   const checkBackupSeq = useRef(0);
 
@@ -42,6 +43,23 @@ export function useApplyPreset() {
       setApplying(false);
     }
   }, []);
+
+  const preview = useCallback(async (presetId: string, instanceName: string, backup: boolean, openModal: (m: ModalState) => void) => {
+    setPreviewing(true);
+    setError(null);
+    try {
+      const result = await previewPresetApi(presetId, instanceName);
+      openModal({
+        type: 'preset-preview',
+        preview: result,
+        onConfirmApply: () => apply(presetId, instanceName, backup, openModal),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Preview failed');
+    } finally {
+      setPreviewing(false);
+    }
+  }, [apply]);
 
   const rollback = useCallback(async (presetId: string, instanceName: string) => {
     setRollingBack(true);
@@ -78,8 +96,8 @@ export function useApplyPreset() {
   const clearRollbackResult = useCallback(() => setRollbackResult(null), []);
 
   return {
-    downloading, applying, downloadResults, error,
-    download, apply,
+    downloading, applying, previewing, downloadResults, error,
+    download, apply, preview,
     rollingBack, rollbackResult, rollback, clearRollbackResult,
     hasBackup, checkBackup,
   };

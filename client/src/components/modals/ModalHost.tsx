@@ -7,6 +7,7 @@ import SettingsModal from './SettingsModal';
 import ModFilePickerModal from '../modifier/ModFilePickerModal';
 import ConfigEditorModal from '../modifier/ConfigEditorModal';
 import ApplyResultsModal from '../modifier/ApplyResultsModal';
+import PresetPreviewModal from '../modifier/PresetPreviewModal';
 
 interface ModalHostProps {
   modal: ModalState;
@@ -32,5 +33,7 @@ export default function ModalHost({ modal }: ModalHostProps) {
       return <ConfigEditorModal targetPath={modal.targetPath} content={modal.content} onSave={modal.onSave} />;
     case 'apply-results':
       return <ApplyResultsModal result={modal.result} />;
+    case 'preset-preview':
+      return <PresetPreviewModal preview={modal.preview} onConfirmApply={modal.onConfirmApply} />;
   }
 }

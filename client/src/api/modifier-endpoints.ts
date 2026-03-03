@@ -8,6 +8,7 @@ import type {
   CfModFile,
   ApplyModResult,
   ApplyPresetResult,
+  PresetPreviewResult,
   RollbackResult,
 } from '../types';
 
@@ -120,6 +121,9 @@ export const applyPreset = (presetId: string, instanceName: string, backup: bool
 
 export const rollbackPreset = (presetId: string, instanceName: string) =>
   post<RollbackResult>(`/api/modifier/presets/${presetId}/rollback`, { instanceName });
+
+export const previewPreset = (presetId: string, instanceName: string) =>
+  post<PresetPreviewResult>(`/api/modifier/presets/${presetId}/preview`, { instanceName });
 
 export const hasPresetBackup = (presetId: string, instanceName: string) =>
   get<{ hasBackup: boolean }>(`/api/modifier/presets/${presetId}/has-backup?instanceName=${encodeURIComponent(instanceName)}`);

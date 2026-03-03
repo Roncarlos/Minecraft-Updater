@@ -19,8 +19,8 @@ export default function ApplyPanel({ presetId, presetName, mcVersion, loader, in
   const [backup, setBackup] = useState(true);
   const confirm = useConfirm();
   const {
-    downloading, applying, downloadResults, error,
-    download, apply,
+    downloading, applying, previewing, downloadResults, error,
+    download, preview,
     rollingBack, rollbackResult, rollback, clearRollbackResult,
     hasBackup, checkBackup,
   } = useApplyPreset();
@@ -47,7 +47,7 @@ export default function ApplyPanel({ presetId, presetName, mcVersion, loader, in
 
   const handleApply = () => {
     if (!instanceName) return;
-    apply(presetId, instanceName, backup, openModal);
+    preview(presetId, instanceName, backup, openModal);
   };
 
   const handleRollback = async () => {
@@ -138,9 +138,9 @@ export default function ApplyPanel({ presetId, presetName, mcVersion, loader, in
           variant="apply"
           size="sm"
           onClick={handleApply}
-          disabled={applying || !instanceName}
+          disabled={applying || previewing || !instanceName}
         >
-          {applying ? 'Applying...' : 'Apply Preset'}
+          {previewing ? 'Loading Preview...' : applying ? 'Applying...' : 'Apply Preset'}
         </Button>
 
         {hasBackup && (
