@@ -29,6 +29,7 @@ export default function ModifierPage() {
             instances={state.instances}
             onUpdate={presets.update}
             onRefresh={presets.refresh}
+            onRefreshFiles={presets.refreshFiles}
             openModal={openModal}
           />
         ) : (

@@ -106,5 +106,20 @@ export function usePresets() {
     } catch (err) { console.warn('Failed to refresh preset:', err); }
   }, [selectedId]);
 
-  return { presets, selectedId, selected, loading, selecting, select, create, update, remove, refresh };
+  const refreshFiles = useCallback(async () => {
+    if (!selectedId) return;
+    try {
+      const preset = await api.refreshPresetFiles(selectedId);
+      setSelected(preset);
+      setPresets(prev => prev.map(p => p.id === selectedId ? {
+        ...p,
+        modCount: preset.mods.length,
+        configCount: preset.configs.length,
+        kubejsCount: preset.kubejs.length,
+        resourcepackCount: preset.resourcepacks.length,
+      } : p));
+    } catch (err) { console.warn('Failed to refresh preset files:', err); }
+  }, [selectedId]);
+
+  return { presets, selectedId, selected, loading, selecting, select, create, update, remove, refresh, refreshFiles };
 }

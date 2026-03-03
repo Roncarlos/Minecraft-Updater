@@ -15,11 +15,14 @@ interface PresetEditorProps {
   instances: Instance[];
   onUpdate: (updates: Partial<Pick<Preset, 'name' | 'description' | 'mcVersion' | 'loader'>>) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onRefreshFiles: () => Promise<void>;
   openModal: (m: ModalState) => void;
 }
 
-export default function PresetEditor({ preset, instances, onUpdate, onRefresh, openModal }: PresetEditorProps) {
+export default function PresetEditor({ preset, instances, onUpdate, onRefresh, onRefreshFiles, openModal }: PresetEditorProps) {
   const [editing, setEditing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [name, setName] = useState(preset.name);
   const [description, setDescription] = useState(preset.description);
   const [mcVersion, setMcVersion] = useState(preset.mcVersion);
@@ -28,6 +31,18 @@ export default function PresetEditor({ preset, instances, onUpdate, onRefresh, o
   const handleSave = async () => {
     await onUpdate({ name, description, mcVersion, loader });
     setEditing(false);
+  };
+
+  const handleRefreshFiles = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await onRefreshFiles();
+    } catch {
+      setRefreshError('Failed to refresh files from disk');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const fieldClass = "flex-1 bg-bg border border-border text-text px-2.5 py-1.5 rounded text-[0.85rem] font-[inherit] focus:outline-none focus:border-info";
@@ -98,9 +113,17 @@ export default function PresetEditor({ preset, instances, onUpdate, onRefresh, o
         <div className={`flex flex-col gap-6${!detailsComplete ? ' pointer-events-none select-none' : ''}`}>
           {/* Mods Section */}
           <div>
-            <h3 className="text-info text-[0.9rem] uppercase tracking-wide mb-3 pb-1.5 border-b border-border">
-              Mods ({preset.mods.length})
-            </h3>
+            <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-border">
+              <h3 className="text-info text-[0.9rem] uppercase tracking-wide">
+                Mods ({preset.mods.length})
+              </h3>
+              <div className="flex items-center gap-2">
+                {refreshError && <span className="text-danger text-[0.8rem]">{refreshError}</span>}
+                <Button variant="settings" size="sm" onClick={handleRefreshFiles} disabled={refreshing}>
+                  {refreshing ? 'Refreshing...' : 'Refresh Files'}
+                </Button>
+              </div>
+            </div>
             <ModSearch presetId={preset.id} mcVersion={preset.mcVersion} loader={preset.loader} openModal={openModal} onModAdded={onRefresh} />
             <PresetModList presetId={preset.id} mods={preset.mods} onRefresh={onRefresh} />
           </div>

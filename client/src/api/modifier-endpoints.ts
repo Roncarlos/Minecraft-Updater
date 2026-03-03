@@ -29,6 +29,9 @@ export const updatePreset = (id: string, updates: Partial<Pick<Preset, 'name' | 
 export const deletePreset = (id: string) =>
   del<{ success: boolean }>(`/api/modifier/presets/${id}`);
 
+export const refreshPresetFiles = (id: string) =>
+  post<Preset>(`/api/modifier/presets/${id}/refresh-files`, {});
+
 // ── CurseForge search ─────────────────────────────────────────────────────
 
 export const searchMods = (q: string, mcVersion?: string, loader?: string) =>

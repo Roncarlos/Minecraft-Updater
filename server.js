@@ -56,6 +56,8 @@ import {
   previewPreset as previewPresetChanges,
   rollbackPreset,
   hasPresetBackup,
+  refreshPresetFiles,
+  refreshAllPresets,
 } from "./lib/modifier.js";
 import { searchMods, getModFiles, LOADER_MAP } from "./lib/curseforge.js";
 
@@ -810,6 +812,15 @@ app.delete(
   }),
 );
 
+// ── Modifier: Refresh files ────────────────────────────────────────────────
+
+app.post(
+  "/api/modifier/presets/:id/refresh-files",
+  wrapAsync(async (req, res) => {
+    res.json(await refreshPresetFiles(req.params.id));
+  }),
+);
+
 // ── Modifier: CurseForge search ───────────────────────────────────────────
 
 app.get(
@@ -1196,6 +1207,15 @@ app.get("/{*path}", (req, res) => {
     await pruneCache();
   } catch (err) {
     console.warn("Cache prune failed:", err.message);
+  }
+
+  // Refresh preset file lists from disk
+  try {
+    const { refreshed, failed } = await refreshAllPresets();
+    console.log(`Preset file lists refreshed (${refreshed} presets)`);
+    if (failed.length) console.warn("Some presets failed to refresh:", failed);
+  } catch (err) {
+    console.warn("Failed to refresh preset files:", err.message);
   }
 
   // Auto-select first available instance
