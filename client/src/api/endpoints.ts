@@ -15,6 +15,9 @@ export const fetchInstances = () =>
 export const selectInstance = (name: string) =>
   post<InstanceMeta>('/api/instance/select', { name });
 
+export const selectInstanceFolder = (path: string) =>
+  post<InstanceMeta & { folderName: string }>('/api/instance/select-folder', { path });
+
 export const fetchInstance = () =>
   get<InstanceMeta>('/api/instance');
 

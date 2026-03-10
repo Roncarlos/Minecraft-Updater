@@ -12,9 +12,15 @@ const STAT_CONFIG = [
 ] as const;
 
 export default function Header() {
-  const { instances, selectedInstance, instanceMeta, switchInstance } = useInstances();
+  const { instances, selectedInstance, instanceMeta, switchInstance, browseFolder } = useInstances();
   const { state } = useAppContext();
   const results = state.scanResults;
+
+  const isCustomFolder = selectedInstance != null && !instances.some(i => i.name === selectedInstance);
+  const options = [
+    ...instances.map(i => ({ value: i.name, label: i.name })),
+    ...(isCustomFolder ? [{ value: selectedInstance, label: `${selectedInstance} (folder)` }] : []),
+  ];
 
   return (
     <div className="text-center mb-8 p-8 bg-surface border border-border rounded-xl">
@@ -27,9 +33,17 @@ export default function Header() {
         <Select
           value={selectedInstance || ''}
           onChange={switchInstance}
-          options={instances.map(i => ({ value: i.name, label: i.name }))}
+          options={options}
           disabled={state.scanRunning}
         />
+        <button
+          onClick={browseFolder}
+          disabled={state.scanRunning}
+          className="px-3 py-1.5 text-[0.85rem] bg-surface-hover border border-border rounded-md text-muted hover:text-text hover:border-info cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Select a folder (e.g. server pack)"
+        >
+          Browse Folder...
+        </button>
       </div>
 
       <div className="text-muted text-[0.9rem]">

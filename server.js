@@ -1,5 +1,5 @@
 import express from "express";
-import { join, dirname, resolve, relative, isAbsolute } from "path";
+import { join, dirname, resolve, relative, isAbsolute, basename } from "path";
 import { fileURLToPath } from "url";
 import { access } from "fs/promises";
 import { execFile } from "child_process";
@@ -126,6 +126,51 @@ app.post("/api/instance/select", async (req, res) => {
     });
   } catch (err) {
     res.status(400).json({ error: `Failed to load instance: ${err.message}` });
+  }
+});
+
+// ── POST /api/instance/select-folder ───────────────────────────────────────
+app.post("/api/instance/select-folder", async (req, res) => {
+  const { path: folderPath } = req.body;
+  if (!folderPath || typeof folderPath !== "string") {
+    res.status(400).json({ error: "Missing folder path" });
+    return;
+  }
+  if (scanRunning) {
+    res
+      .status(409)
+      .json({ error: "Cannot switch profile while a scan is running" });
+    return;
+  }
+
+  const resolved = resolve(folderPath);
+  try {
+    await access(resolved);
+  } catch {
+    res.status(400).json({ error: `Folder not found: ${resolved}` });
+    return;
+  }
+
+  try {
+    const data = await loadInstance(resolved);
+    selectedInstancePath = resolved;
+    // Clear stale results from previous profile
+    lastScanResults = null;
+    lastScanVersion = null;
+    lastConfigRefs = {};
+    lastRefSeverity = {};
+    const folderName = basename(resolved);
+    res.json({
+      instanceName: data.instanceName,
+      mcVersion: data.mcVersion,
+      loaderName: data.loaderName,
+      modCount: data.allAddons.length,
+      folderName,
+    });
+  } catch (err) {
+    res
+      .status(400)
+      .json({ error: `Failed to load instance from folder: ${err.message}` });
   }
 });
 
